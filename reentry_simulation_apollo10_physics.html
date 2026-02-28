@@ -1,0 +1,2308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atmospheric Reentry Control Simulation</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-bg: #0a0e17;
+            --secondary-bg: #141922;
+            --accent-orange: #ff6b35;
+            --accent-blue: #00d9ff;
+            --accent-green: #39ff14;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0a6;
+            --border-color: #2d3748;
+            --glow-orange: rgba(255, 107, 53, 0.3);
+            --glow-blue: rgba(0, 217, 255, 0.3);
+        }
+
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background: linear-gradient(135deg, #0a0e17 0%, #1a1f2e 100%);
+            color: var(--text-primary);
+            padding: 10px;
+            min-height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                radial-gradient(circle at 20% 30%, var(--glow-orange) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, var(--glow-blue) 0%, transparent 50%);
+            opacity: 0.1;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            height: calc(100vh - 20px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 15px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .left-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .left-panel::-webkit-scrollbar-track {
+            background: var(--primary-bg);
+            border-radius: 3px;
+        }
+
+        .left-panel::-webkit-scrollbar-thumb {
+            background: var(--accent-orange);
+            border-radius: 3px;
+        }
+
+        .left-panel::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-blue);
+        }
+
+        .charts-section {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .charts-section::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .charts-section::-webkit-scrollbar-track {
+            background: var(--primary-bg);
+            border-radius: 3px;
+        }
+
+        .charts-section::-webkit-scrollbar-thumb {
+            background: var(--accent-blue);
+            border-radius: 3px;
+        }
+
+        .charts-section::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-orange);
+        }
+
+        .chart-container {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 900;
+            text-align: center;
+            margin-bottom: 3px;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            animation: titleGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes titleGlow {
+            0%, 100% { filter: drop-shadow(0 0 10px var(--glow-orange)); }
+            50% { filter: drop-shadow(0 0 20px var(--glow-blue)); }
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.65rem;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .credits {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.55rem;
+            margin-top: 5px;
+            letter-spacing: 1px;
+            font-style: italic;
+        }
+
+        .credits-name {
+            color: var(--accent-orange);
+            font-weight: 500;
+        }
+
+        .controls-section {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .controls-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .control-group {
+            background: var(--primary-bg);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .control-group:hover {
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 20px var(--glow-orange);
+        }
+
+        .control-label {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            margin-bottom: 6px;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .slider-container {
+            position: relative;
+            margin-bottom: 6px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: linear-gradient(90deg, var(--accent-orange), var(--accent-blue));
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--accent-orange);
+            border: 2px solid var(--text-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--glow-orange);
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 20px var(--glow-orange);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: var(--accent-orange);
+            border: 2px solid var(--text-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--glow-orange);
+            transition: all 0.2s ease;
+        }
+
+        .value-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .current-value {
+            color: var(--accent-green);
+            font-weight: 500;
+            font-size: 0.7rem;
+        }
+
+        .metrics-section {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .metric-card {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 20px var(--glow-blue);
+        }
+
+        .metric-label {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--accent-orange);
+        }
+
+        .metric-unit {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            margin-left: 2px;
+        }
+
+        .toggle-section {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .toggle-label {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            flex: 1;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border-color);
+            transition: 0.3s;
+            border-radius: 26px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-blue));
+            box-shadow: 0 0 10px var(--glow-orange);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        .chart-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .bank-mode-btn.active {
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-blue)) !important;
+            color: white !important;
+            border-color: var(--accent-blue) !important;
+        }
+
+        .bank-mode-btn:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .bank-mode-content {
+            display: none;
+        }
+
+        .bank-mode-content.active {
+            display: block;
+        }
+
+        canvas {
+            max-height: 160px !important;
+            width: 100% !important;
+            display: block;
+        }
+        
+        .chart-container canvas {
+            position: relative;
+        }
+
+        /* Apollo 10 Indicator */
+        #apollo10Indicator {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: linear-gradient(135deg, var(--accent-orange), #ff8c42);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+            z-index: 1000;
+            display: none;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4); }
+            50% { box-shadow: 0 4px 20px rgba(255, 107, 53, 0.8); }
+        }
+
+        #apollo10Indicator .indicator-title {
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        #apollo10Indicator .indicator-details {
+            font-size: 0.65rem;
+            font-family: 'Roboto Mono', monospace;
+            font-weight: 400;
+            opacity: 0.95;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8rem; }
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+            .metrics-section { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Apollo 10 Indicator -->
+    <div id="apollo10Indicator">
+        <div class="indicator-title">🚀 APOLLO 10 MODE ACTIVE</div>
+        <div class="indicator-details">Using historical reentry conditions (May 26, 1969)</div>
+    </div>
+
+    <div class="container">
+        <h1>Reentry Control Simulation</h1>
+        <p class="subtitle">3 Degree-of-Freedom Atmospheric Reentry Dynamics</p>
+        <p class="credits">Created by <span class="credits-name">Maj "MOAB" Olsen</span> & <span class="credits-name">Claude (Anthropic)</span></p>
+
+        <div class="main-layout">
+            <div class="left-panel">
+                <div class="controls-section">
+                    <div class="controls-grid">
+                        <div class="control-group">
+                            <label class="control-label">Vehicle Mass</label>
+                            <div class="slider-container">
+                                <input type="range" id="mass" min="2000" max="10000" value="5000" step="100">
+                            </div>
+                            <div class="value-display">
+                                <span>2,000 kg</span>
+                                <span class="current-value" id="mass-value">5,000 kg</span>
+                                <span>10,000 kg</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label class="control-label">Entry Velocity</label>
+                            <div class="slider-container">
+                                <input type="range" id="velocity" min="7" max="12" value="9" step="0.1">
+                            </div>
+                            <div class="value-display">
+                                <span>7.0 km/s</span>
+                                <span class="current-value" id="velocity-value">9.0 km/s</span>
+                                <span>12.0 km/s</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label class="control-label">Flight Path Angle</label>
+                            <div class="slider-container">
+                                <input type="range" id="fpa" min="-20" max="5" value="-5" step="0.5">
+                            </div>
+                            <div class="value-display">
+                                <span>-20.0°</span>
+                                <span class="current-value" id="fpa-value">-5.0°</span>
+                                <span>5.0°</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label class="control-label">Bank Angle</label>
+                            <div style="display: flex; gap: 3px; margin-bottom: 8px; flex-wrap: wrap;">
+                                <button class="bank-mode-btn active" data-mode="constant" style="flex: 1; padding: 6px 4px; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-family: 'Roboto Mono', monospace; font-size: 0.65rem; cursor: pointer; transition: all 0.3s ease; text-align: center;">Constant</button>
+                                <button class="bank-mode-btn" data-mode="piecewise" style="flex: 1; padding: 6px 4px; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-family: 'Roboto Mono', monospace; font-size: 0.65rem; cursor: pointer; transition: all 0.3s ease; text-align: center;">Piecewise</button>
+                                <button class="bank-mode-btn" data-mode="visual" style="flex: 1; padding: 6px 4px; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-family: 'Roboto Mono', monospace; font-size: 0.65rem; cursor: pointer; transition: all 0.3s ease; text-align: center;">Visual</button>
+                                <button class="bank-mode-btn" data-mode="csv" style="flex: 1; padding: 6px 4px; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-family: 'Roboto Mono', monospace; font-size: 0.65rem; cursor: pointer; transition: all 0.3s ease; text-align: center;">CSV</button>
+                                <button class="bank-mode-btn" data-mode="apollo10" style="flex: 1; padding: 6px 4px; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-secondary); font-family: 'Roboto Mono', monospace; font-size: 0.65rem; cursor: pointer; transition: all 0.3s ease; text-align: center;">Apollo 10</button>
+                            </div>
+                            
+                            <!-- Constant Mode -->
+                            <div class="bank-mode-content" id="constantMode">
+                                <div class="slider-container">
+                                    <input type="range" id="bank" min="0" max="180" value="0" step="5">
+                                </div>
+                                <div class="value-display">
+                                    <span>0°</span>
+                                    <span class="current-value" id="bank-value">0°</span>
+                                    <span>180°</span>
+                                </div>
+                            </div>
+
+                            <!-- Piecewise Mode -->
+                            <div class="bank-mode-content" id="piecewiseMode" style="display: none;">
+                                <div style="max-height: 120px; overflow-y: auto; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 6px; margin-bottom: 6px;" id="waypointList"></div>
+                                <button id="addWaypoint" style="width: 100%; padding: 6px; background: var(--accent-green); border: none; border-radius: 4px; color: var(--primary-bg); font-family: 'Roboto Mono', monospace; font-size: 0.65rem; font-weight: 700; cursor: pointer;">+ Add Waypoint</button>
+                            </div>
+
+                            <!-- Visual Editor Mode -->
+                            <div class="bank-mode-content" id="visualMode" style="display: none;">
+                                <div style="background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; margin-bottom: 6px;">
+                                    <canvas id="bankProfileCanvas" style="width: 100%; height: 140px; cursor: crosshair; border-radius: 4px;"></canvas>
+                                </div>
+                                <div style="display: flex; gap: 4px;">
+                                    <button id="clearCanvas" style="flex: 1; padding: 6px; background: var(--accent-orange); border: none; border-radius: 4px; color: white; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; cursor: pointer;">Clear</button>
+                                    <button id="smoothCanvas" style="flex: 1; padding: 6px; background: var(--accent-blue); border: none; border-radius: 4px; color: white; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; cursor: pointer;">Smooth</button>
+                                </div>
+                            </div>
+
+                            <!-- CSV Mode -->
+                            <div class="bank-mode-content" id="csvMode" style="display: none;">
+                                <div style="font-size: 0.6rem; color: var(--text-secondary); margin-bottom: 6px; line-height: 1.3;">
+                                    Space-delimited format:<br>
+                                    time angle<br>
+                                    Example: 0 0<br>
+                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;100 60
+                                </div>
+                                <textarea id="csvInput" style="width: 100%; min-height: 80px; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 6px; color: var(--text-primary); font-family: 'Roboto Mono', monospace; font-size: 0.65rem; resize: vertical; margin-bottom: 6px;" placeholder="0 0
+100 60
+200 45"></textarea>
+                                <button id="applyCSV" style="width: 100%; padding: 6px; background: var(--accent-blue); border: none; border-radius: 4px; color: white; font-family: 'Roboto Mono', monospace; font-size: 0.65rem; font-weight: 700; cursor: pointer;">Apply CSV Data</button>
+                            </div>
+
+                            <!-- Apollo 10 Mode -->
+                            <div class="bank-mode-content" id="apollo10Mode" style="display: none;">
+                                <div style="background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px;">
+                                    <div style="font-size: 0.65rem; color: var(--accent-orange); font-weight: 700; margin-bottom: 4px;">Apollo 10 Reentry</div>
+                                    <div style="font-size: 0.6rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 6px;">
+                                        Historical bank angle data from Apollo 10 Command Module (May 26, 1969). Skip-entry technique.
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.6rem; padding: 3px 0; border-bottom: 1px solid var(--border-color);">
+                                        <span style="color: var(--text-secondary);">Data Points:</span>
+                                        <span style="color: var(--accent-green); font-weight: 700;">551</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.6rem; padding: 3px 0; border-bottom: 1px solid var(--border-color);">
+                                        <span style="color: var(--text-secondary);">Duration:</span>
+                                        <span style="color: var(--accent-green); font-weight: 700;">550 sec</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.6rem; padding: 3px 0;">
+                                        <span style="color: var(--text-secondary);">Max Bank:</span>
+                                        <span style="color: var(--accent-green); font-weight: 700;">180°</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label class="control-label">Lift-to-Drag Ratio (L/D)</label>
+                            <div class="slider-container">
+                                <input type="range" id="ld" min="0" max="1" value="0.3" step="0.05">
+                            </div>
+                            <div class="value-display">
+                                <span>0.00</span>
+                                <span class="current-value" id="ld-value">0.30</span>
+                                <span>1.00</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label class="control-label">Drag Coefficient (C<sub>D</sub>)</label>
+                            <div class="slider-container">
+                                <input type="range" id="cd" min="0.5" max="2.5" value="1.5" step="0.1">
+                            </div>
+                            <div class="value-display">
+                                <span>0.5</span>
+                                <span class="current-value" id="cd-value">1.5</span>
+                                <span>2.5</span>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <label class="control-label">Reference Area (S)</label>
+                            <div class="slider-container">
+                                <input type="range" id="sref" min="5" max="50" value="15" step="1">
+                            </div>
+                            <div class="value-display">
+                                <span>5 m²</span>
+                                <span class="current-value" id="sref-value">15 m²</span>
+                                <span>50 m²</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metrics-section">
+                    <div class="metric-card">
+                        <div class="metric-label">Max Deceleration</div>
+                        <div class="metric-value" id="max-decel">---<span class="metric-unit">g</span></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Peak Heat Flux</div>
+                        <div class="metric-value" id="peak-heat">---<span class="metric-unit">kW/m²</span></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Peak Heat Altitude</div>
+                        <div class="metric-value" id="heat-alt">---<span class="metric-unit">km</span></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Peak Stagnation Temp</div>
+                        <div class="metric-value" id="stag-temp">---<span class="metric-unit">°F</span></div>
+                    </div>
+                </div>
+
+                <div class="toggle-section">
+                    <div class="toggle-container">
+                        <label class="toggle-label">Show Peak Heat Flux Indicators</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="peak-indicator-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div style="margin-top: 15px; padding: 0 12px;">
+                    <button id="launch-viz-btn" style="
+                        width: 100%;
+                        padding: 12px;
+                        font-family: 'Orbitron', sans-serif;
+                        font-size: 12px;
+                        font-weight: 700;
+                        background: linear-gradient(135deg, #ff6b35, #00d9ff);
+                        color: #fff;
+                        border: 2px solid rgba(255, 255, 255, 0.3);
+                        border-radius: 8px;
+                        cursor: pointer;
+                        box-shadow: 0 4px 20px rgba(255, 107, 53, 0.5);
+                        transition: all 0.3s ease;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                    ">🚀 Launch 3-D Trajectory Visualization</button>
+                </div>
+            </div>
+
+            <div class="charts-section">
+                <div class="chart-container">
+                    <div class="chart-title">Bank Angle vs Time</div>
+                    <canvas id="bankAngleChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Altitude vs Time</div>
+                    <canvas id="altitudeChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Velocity vs Time</div>
+                    <canvas id="velocityChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Deceleration vs Time</div>
+                    <canvas id="decelChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Heat Flux vs Time</div>
+                    <canvas id="heatChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Flight Path Angle vs Time</div>
+                    <canvas id="fpaChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Altitude vs Downrange</div>
+                    <canvas id="downrangeChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Altitude vs Crossrange</div>
+                    <canvas id="crossrangeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update slider values and auto-run simulation
+        const sliders = ['mass', 'velocity', 'fpa', 'bank', 'ld', 'cd', 'sref'];
+        sliders.forEach(slider => {
+            const input = document.getElementById(slider);
+            const display = document.getElementById(`${slider}-value`);
+            
+            input.addEventListener('input', () => {
+                let value = parseFloat(input.value);
+                let formatted;
+                
+                switch(slider) {
+                    case 'mass':
+                        formatted = `${value.toLocaleString()} kg`;
+                        break;
+                    case 'velocity':
+                        formatted = `${value.toFixed(1)} km/s`;
+                        break;
+                    case 'fpa':
+                    case 'bank':
+                        formatted = `${value.toFixed(1)}°`;
+                        break;
+                    case 'ld':
+                        formatted = value.toFixed(2);
+                        break;
+                    case 'cd':
+                        formatted = value.toFixed(1);
+                        break;
+                    case 'sref':
+                        formatted = `${value.toFixed(0)} m²`;
+                        break;
+                }
+                
+                display.textContent = formatted;
+                
+                // Hide Apollo 10 indicator when any parameter changes
+                useApollo10InitialConditions = false;
+                hideApollo10Indicator();
+                
+                // Auto-run simulation when slider changes
+                runSimulation();
+            });
+        });
+
+        // Chart instances
+        let charts = {};
+        window.charts = charts; // Make accessible to telemetry bridge
+        let peakHeatTime = 0;
+        let peakHeatAltitude = 0;
+
+        // Bank angle mode variables
+        let currentBankMode = 'constant';
+        
+        // Apollo 10 initial conditions flag and data
+        let useApollo10InitialConditions = false;
+        const apollo10InitialConditions = {
+            longitude: 174.24384,      // degrees East
+            latitude: -23.51457,       // degrees South
+            mass: 5498.2,              // kg
+            velocity: 11.06715,        // km/s (exact)
+            fpa: -6.62,                // degrees
+            ld: 0.4082 / 1.2569,       // L/D ratio (0.3246)
+            cd: 1.2569,                // drag coefficient
+            area: 12.02,               // m^2
+            azimuth: 18.07             // degrees (heading angle)
+        };
+        let waypoints = [{time: 0, angle: 0}, {time: 400, angle: 0}];
+        let visualProfile = [];
+        let canvas, ctx;
+        let isDrawing = false;
+
+        // Apollo 10 Bank Angle Profile Data
+        const APOLLO_10_PROFILE = [{"time": 0.0, "angle": 0.0}, {"time": 1.0, "angle": 0.0}, {"time": 2.0, "angle": 0.0}, {"time": 3.0, "angle": 0.0}, {"time": 4.0, "angle": 0.0}, {"time": 5.0, "angle": 0.0}, {"time": 6.0, "angle": 0.0}, {"time": 7.0, "angle": 0.0}, {"time": 8.0, "angle": 0.0}, {"time": 9.0, "angle": 0.0}, {"time": 10.0, "angle": 0.0}, {"time": 11.0, "angle": 0.0}, {"time": 12.0, "angle": 0.0}, {"time": 13.0, "angle": 0.0}, {"time": 14.0, "angle": 0.0}, {"time": 15.0, "angle": 0.0}, {"time": 16.0, "angle": 0.0}, {"time": 17.0, "angle": 0.0}, {"time": 18.0, "angle": 0.0}, {"time": 19.0, "angle": 0.0}, {"time": 20.0, "angle": 0.0}, {"time": 21.0, "angle": 0.0}, {"time": 22.0, "angle": 0.0}, {"time": 23.0, "angle": 0.0}, {"time": 24.0, "angle": 0.0}, {"time": 25.0, "angle": 0.0}, {"time": 26.0, "angle": 0.0}, {"time": 27.0, "angle": 0.0}, {"time": 28.0, "angle": 0.0}, {"time": 29.0, "angle": 0.0}, {"time": 30.0, "angle": 0.0}, {"time": 31.0, "angle": 0.0}, {"time": 32.0, "angle": 0.0}, {"time": 33.0, "angle": 0.0}, {"time": 34.0, "angle": 0.0}, {"time": 35.0, "angle": 0.0}, {"time": 36.0, "angle": 0.0}, {"time": 37.0, "angle": 0.0}, {"time": 38.0, "angle": 0.0}, {"time": 39.0, "angle": 0.0}, {"time": 40.0, "angle": 0.0}, {"time": 41.0, "angle": 0.0}, {"time": 42.0, "angle": 0.0}, {"time": 43.0, "angle": 0.0}, {"time": 44.0, "angle": 0.0}, {"time": 45.0, "angle": 0.0}, {"time": 46.0, "angle": 0.0}, {"time": 47.0, "angle": 0.0}, {"time": 48.0, "angle": 0.0}, {"time": 49.0, "angle": 0.0}, {"time": 50.0, "angle": 0.0}, {"time": 51.0, "angle": 0.0}, {"time": 52.0, "angle": 0.0}, {"time": 53.0, "angle": 0.0}, {"time": 54.0, "angle": 0.0}, {"time": 55.0, "angle": 0.0}, {"time": 56.0, "angle": 0.0}, {"time": 57.0, "angle": 0.0}, {"time": 58.0, "angle": 0.0}, {"time": 59.0, "angle": 0.0}, {"time": 60.0, "angle": 0.0}, {"time": 61.0, "angle": 0.0}, {"time": 62.0, "angle": 0.0}, {"time": 63.0, "angle": 0.0}, {"time": 64.0, "angle": 0.0}, {"time": 65.0, "angle": 0.0}, {"time": 66.0, "angle": 0.0}, {"time": 67.0, "angle": 0.0}, {"time": 68.0, "angle": 0.0}, {"time": 69.0, "angle": 0.0}, {"time": 70.0, "angle": 0.0}, {"time": 71.0, "angle": 0.0}, {"time": 72.0, "angle": 0.0}, {"time": 73.0, "angle": 0.0}, {"time": 74.0, "angle": 0.0}, {"time": 75.0, "angle": 0.0}, {"time": 76.0, "angle": 0.0}, {"time": 77.0, "angle": 0.0}, {"time": 78.0, "angle": 0.0}, {"time": 79.0, "angle": 0.0}, {"time": 80.0, "angle": 0.0}, {"time": 81.0, "angle": 0.0}, {"time": 82.0, "angle": 0.0}, {"time": 83.0, "angle": 0.0}, {"time": 84.0, "angle": 0.0}, {"time": 85.0, "angle": 0.0}, {"time": 86.0, "angle": 0.0}, {"time": 87.0, "angle": 0.0}, {"time": 88.0, "angle": 22.9}, {"time": 89.0, "angle": 22.9}, {"time": 90.0, "angle": 82.1}, {"time": 91.0, "angle": 82.1}, {"time": 92.0, "angle": 90.0}, {"time": 93.0, "angle": 90.0}, {"time": 94.0, "angle": 90.0}, {"time": 95.0, "angle": 90.0}, {"time": 96.0, "angle": 180.0}, {"time": 97.0, "angle": 180.0}, {"time": 98.0, "angle": 180.0}, {"time": 99.0, "angle": 180.0}, {"time": 100.0, "angle": 180.0}, {"time": 101.0, "angle": 180.0}, {"time": 102.0, "angle": 180.0}, {"time": 103.0, "angle": 180.0}, {"time": 104.0, "angle": 180.0}, {"time": 105.0, "angle": 180.0}, {"time": 106.0, "angle": 180.0}, {"time": 107.0, "angle": 180.0}, {"time": 108.0, "angle": 180.0}, {"time": 109.0, "angle": 180.0}, {"time": 110.0, "angle": 180.0}, {"time": 111.0, "angle": 180.0}, {"time": 112.0, "angle": 180.0}, {"time": 113.0, "angle": 180.0}, {"time": 114.0, "angle": 180.0}, {"time": 115.0, "angle": 180.0}, {"time": 116.0, "angle": 180.0}, {"time": 117.0, "angle": 180.0}, {"time": 118.0, "angle": 180.0}, {"time": 119.0, "angle": 180.0}, {"time": 120.0, "angle": 180.0}, {"time": 121.0, "angle": 180.0}, {"time": 122.0, "angle": 180.0}, {"time": 123.0, "angle": 180.0}, {"time": 124.0, "angle": 180.0}, {"time": 125.0, "angle": 180.0}, {"time": 126.0, "angle": 180.0}, {"time": 127.0, "angle": 180.0}, {"time": 128.0, "angle": 180.0}, {"time": 129.0, "angle": 180.0}, {"time": 130.0, "angle": 180.0}, {"time": 131.0, "angle": 180.0}, {"time": 132.0, "angle": 180.0}, {"time": 133.0, "angle": 180.0}, {"time": 134.0, "angle": 180.0}, {"time": 135.0, "angle": 180.0}, {"time": 136.0, "angle": 180.0}, {"time": 137.0, "angle": 180.0}, {"time": 138.0, "angle": 0.0}, {"time": 139.0, "angle": 0.0}, {"time": 140.0, "angle": 0.0}, {"time": 141.0, "angle": 0.0}, {"time": 142.0, "angle": 0.0}, {"time": 143.0, "angle": 0.0}, {"time": 144.0, "angle": 0.0}, {"time": 145.0, "angle": 0.0}, {"time": 146.0, "angle": 0.0}, {"time": 147.0, "angle": 0.0}, {"time": 148.0, "angle": 0.0}, {"time": 149.0, "angle": 0.0}, {"time": 150.0, "angle": 0.0}, {"time": 151.0, "angle": 0.0}, {"time": 152.0, "angle": 0.0}, {"time": 153.0, "angle": 0.0}, {"time": 154.0, "angle": 0.0}, {"time": 155.0, "angle": 0.0}, {"time": 156.0, "angle": 0.0}, {"time": 157.0, "angle": 0.0}, {"time": 158.0, "angle": 0.0}, {"time": 159.0, "angle": 0.0}, {"time": 160.0, "angle": 0.0}, {"time": 161.0, "angle": 0.0}, {"time": 162.0, "angle": 0.0}, {"time": 163.0, "angle": 0.0}, {"time": 164.0, "angle": 0.0}, {"time": 165.0, "angle": 0.0}, {"time": 166.0, "angle": 15.4}, {"time": 167.0, "angle": 15.4}, {"time": 168.0, "angle": 15.4}, {"time": 169.0, "angle": 15.4}, {"time": 170.0, "angle": 41.7}, {"time": 171.0, "angle": 41.7}, {"time": 172.0, "angle": 41.7}, {"time": 173.0, "angle": 41.7}, {"time": 174.0, "angle": 49.5}, {"time": 175.0, "angle": 49.5}, {"time": 176.0, "angle": 49.5}, {"time": 177.0, "angle": 49.5}, {"time": 178.0, "angle": 49.5}, {"time": 179.0, "angle": 49.5}, {"time": 180.0, "angle": 35.3}, {"time": 181.0, "angle": 35.3}, {"time": 182.0, "angle": 32.4}, {"time": 183.0, "angle": 32.4}, {"time": 184.0, "angle": 32.4}, {"time": 185.0, "angle": 32.4}, {"time": 186.0, "angle": 32.4}, {"time": 187.0, "angle": 32.4}, {"time": 188.0, "angle": 32.4}, {"time": 189.0, "angle": 32.4}, {"time": 190.0, "angle": 42.4}, {"time": 191.0, "angle": 42.4}, {"time": 192.0, "angle": 42.4}, {"time": 193.0, "angle": 42.4}, {"time": 194.0, "angle": 42.4}, {"time": 195.0, "angle": 42.4}, {"time": 196.0, "angle": 42.4}, {"time": 197.0, "angle": 42.4}, {"time": 198.0, "angle": 42.4}, {"time": 199.0, "angle": 42.4}, {"time": 200.0, "angle": 51.9}, {"time": 201.0, "angle": 51.9}, {"time": 202.0, "angle": 51.9}, {"time": 203.0, "angle": 51.9}, {"time": 204.0, "angle": 51.9}, {"time": 205.0, "angle": 51.9}, {"time": 206.0, "angle": 51.9}, {"time": 207.0, "angle": 51.9}, {"time": 208.0, "angle": 51.9}, {"time": 209.0, "angle": 51.9}, {"time": 210.0, "angle": 54.2}, {"time": 211.0, "angle": 54.2}, {"time": 212.0, "angle": 54.2}, {"time": 213.0, "angle": 54.2}, {"time": 214.0, "angle": 54.2}, {"time": 215.0, "angle": 54.2}, {"time": 216.0, "angle": 54.6}, {"time": 217.0, "angle": 54.6}, {"time": 218.0, "angle": -55.3}, {"time": 219.0, "angle": -55.3}, {"time": 220.0, "angle": -55.3}, {"time": 221.0, "angle": -55.3}, {"time": 222.0, "angle": -55.3}, {"time": 223.0, "angle": -55.3}, {"time": 224.0, "angle": -55.3}, {"time": 225.0, "angle": -55.3}, {"time": 226.0, "angle": -55.3}, {"time": 227.0, "angle": -55.3}, {"time": 228.0, "angle": -55.3}, {"time": 229.0, "angle": -55.3}, {"time": 230.0, "angle": -68.3}, {"time": 231.0, "angle": -68.3}, {"time": 232.0, "angle": -68.3}, {"time": 233.0, "angle": -68.3}, {"time": 234.0, "angle": -68.3}, {"time": 235.0, "angle": -68.3}, {"time": 236.0, "angle": -68.3}, {"time": 237.0, "angle": -68.3}, {"time": 238.0, "angle": -68.3}, {"time": 239.0, "angle": -68.3}, {"time": 240.0, "angle": -74.2}, {"time": 241.0, "angle": -74.2}, {"time": 242.0, "angle": -74.2}, {"time": 243.0, "angle": -74.2}, {"time": 244.0, "angle": -74.2}, {"time": 245.0, "angle": -74.2}, {"time": 246.0, "angle": -74.2}, {"time": 247.0, "angle": -74.2}, {"time": 248.0, "angle": -74.2}, {"time": 249.0, "angle": -74.2}, {"time": 250.0, "angle": -79.3}, {"time": 251.0, "angle": -79.3}, {"time": 252.0, "angle": -79.3}, {"time": 253.0, "angle": -79.3}, {"time": 254.0, "angle": -79.3}, {"time": 255.0, "angle": -79.3}, {"time": 256.0, "angle": -79.3}, {"time": 257.0, "angle": -79.3}, {"time": 258.0, "angle": -79.3}, {"time": 259.0, "angle": -79.3}, {"time": 260.0, "angle": -81.1}, {"time": 261.0, "angle": -81.1}, {"time": 262.0, "angle": -81.1}, {"time": 263.0, "angle": -81.1}, {"time": 264.0, "angle": -81.1}, {"time": 265.0, "angle": -81.1}, {"time": 266.0, "angle": -81.1}, {"time": 267.0, "angle": -81.1}, {"time": 268.0, "angle": -81.1}, {"time": 269.0, "angle": -81.1}, {"time": 270.0, "angle": -82.3}, {"time": 271.0, "angle": -82.3}, {"time": 272.0, "angle": -82.3}, {"time": 273.0, "angle": -82.3}, {"time": 274.0, "angle": -82.3}, {"time": 275.0, "angle": -82.3}, {"time": 276.0, "angle": -82.3}, {"time": 277.0, "angle": -82.3}, {"time": 278.0, "angle": -82.3}, {"time": 279.0, "angle": -82.3}, {"time": 280.0, "angle": -81.9}, {"time": 281.0, "angle": -81.9}, {"time": 282.0, "angle": -81.9}, {"time": 283.0, "angle": -81.9}, {"time": 284.0, "angle": -81.9}, {"time": 285.0, "angle": -81.9}, {"time": 286.0, "angle": -81.9}, {"time": 287.0, "angle": -81.9}, {"time": 288.0, "angle": -81.9}, {"time": 289.0, "angle": -81.9}, {"time": 290.0, "angle": -82.3}, {"time": 291.0, "angle": -82.3}, {"time": 292.0, "angle": -82.3}, {"time": 293.0, "angle": -82.3}, {"time": 294.0, "angle": -82.3}, {"time": 295.0, "angle": -82.3}, {"time": 296.0, "angle": -82.3}, {"time": 297.0, "angle": -82.3}, {"time": 298.0, "angle": -82.3}, {"time": 299.0, "angle": -82.3}, {"time": 300.0, "angle": -77.2}, {"time": 301.0, "angle": -77.2}, {"time": 302.0, "angle": -77.2}, {"time": 303.0, "angle": -77.2}, {"time": 304.0, "angle": -77.2}, {"time": 305.0, "angle": -77.2}, {"time": 306.0, "angle": -77.2}, {"time": 307.0, "angle": -77.2}, {"time": 308.0, "angle": -77.2}, {"time": 309.0, "angle": -77.2}, {"time": 310.0, "angle": -73.5}, {"time": 311.0, "angle": -73.5}, {"time": 312.0, "angle": -73.5}, {"time": 313.0, "angle": -73.5}, {"time": 314.0, "angle": -73.5}, {"time": 315.0, "angle": -73.5}, {"time": 316.0, "angle": -73.5}, {"time": 317.0, "angle": -73.5}, {"time": 318.0, "angle": -73.5}, {"time": 319.0, "angle": -73.5}, {"time": 320.0, "angle": -70.4}, {"time": 321.0, "angle": -70.4}, {"time": 322.0, "angle": -43.7}, {"time": 323.0, "angle": -43.7}, {"time": 324.0, "angle": -43.7}, {"time": 325.0, "angle": -43.7}, {"time": 326.0, "angle": -43.7}, {"time": 327.0, "angle": -43.7}, {"time": 328.0, "angle": -43.7}, {"time": 329.0, "angle": -43.7}, {"time": 330.0, "angle": -32.1}, {"time": 331.0, "angle": -32.1}, {"time": 332.0, "angle": -32.1}, {"time": 333.0, "angle": -32.1}, {"time": 334.0, "angle": -32.1}, {"time": 335.0, "angle": -32.1}, {"time": 336.0, "angle": -32.1}, {"time": 337.0, "angle": -32.1}, {"time": 338.0, "angle": -58.8}, {"time": 339.0, "angle": -58.8}, {"time": 340.0, "angle": 62.8}, {"time": 341.0, "angle": 62.8}, {"time": 342.0, "angle": 63.0}, {"time": 343.0, "angle": 63.0}, {"time": 344.0, "angle": 63.0}, {"time": 345.0, "angle": 63.0}, {"time": 346.0, "angle": 63.0}, {"time": 347.0, "angle": 63.0}, {"time": 348.0, "angle": 63.0}, {"time": 349.0, "angle": 63.0}, {"time": 350.0, "angle": 91.9}, {"time": 351.0, "angle": 91.9}, {"time": 352.0, "angle": 94.0}, {"time": 353.0, "angle": 94.0}, {"time": 354.0, "angle": 94.0}, {"time": 355.0, "angle": 94.0}, {"time": 356.0, "angle": 94.0}, {"time": 357.0, "angle": 94.0}, {"time": 358.0, "angle": 94.0}, {"time": 359.0, "angle": 94.0}, {"time": 360.0, "angle": 78.5}, {"time": 361.0, "angle": 78.5}, {"time": 362.0, "angle": 78.5}, {"time": 363.0, "angle": 78.5}, {"time": 364.0, "angle": 78.5}, {"time": 365.0, "angle": 78.5}, {"time": 366.0, "angle": 78.5}, {"time": 367.0, "angle": 78.5}, {"time": 368.0, "angle": 78.5}, {"time": 369.0, "angle": 78.5}, {"time": 370.0, "angle": 72.5}, {"time": 371.0, "angle": 72.5}, {"time": 372.0, "angle": 72.5}, {"time": 373.0, "angle": 72.5}, {"time": 374.0, "angle": 72.5}, {"time": 375.0, "angle": 72.5}, {"time": 376.0, "angle": 72.5}, {"time": 377.0, "angle": 72.5}, {"time": 378.0, "angle": 72.5}, {"time": 379.0, "angle": 72.5}, {"time": 380.0, "angle": 64.1}, {"time": 381.0, "angle": 64.1}, {"time": 382.0, "angle": 57.0}, {"time": 383.0, "angle": 57.0}, {"time": 384.0, "angle": -48.9}, {"time": 385.0, "angle": -48.9}, {"time": 386.0, "angle": -48.9}, {"time": 387.0, "angle": -48.9}, {"time": 388.0, "angle": -48.9}, {"time": 389.0, "angle": -48.9}, {"time": 390.0, "angle": -65.5}, {"time": 391.0, "angle": -65.5}, {"time": 392.0, "angle": -65.5}, {"time": 393.0, "angle": -65.5}, {"time": 394.0, "angle": -65.5}, {"time": 395.0, "angle": -65.5}, {"time": 396.0, "angle": -81.1}, {"time": 397.0, "angle": -81.1}, {"time": 398.0, "angle": -81.1}, {"time": 399.0, "angle": -81.1}, {"time": 400.0, "angle": -84.7}, {"time": 401.0, "angle": -84.7}, {"time": 402.0, "angle": -84.7}, {"time": 403.0, "angle": -84.7}, {"time": 404.0, "angle": -84.7}, {"time": 405.0, "angle": -84.7}, {"time": 406.0, "angle": -84.7}, {"time": 407.0, "angle": -84.7}, {"time": 408.0, "angle": -84.7}, {"time": 409.0, "angle": -84.7}, {"time": 410.0, "angle": -83.3}, {"time": 411.0, "angle": -83.3}, {"time": 412.0, "angle": -83.3}, {"time": 413.0, "angle": -83.3}, {"time": 414.0, "angle": -83.3}, {"time": 415.0, "angle": -83.3}, {"time": 416.0, "angle": -83.3}, {"time": 417.0, "angle": -83.3}, {"time": 418.0, "angle": -86.0}, {"time": 419.0, "angle": -86.0}, {"time": 420.0, "angle": -86.0}, {"time": 421.0, "angle": -86.0}, {"time": 422.0, "angle": -86.0}, {"time": 423.0, "angle": -86.0}, {"time": 424.0, "angle": -86.0}, {"time": 425.0, "angle": -86.0}, {"time": 426.0, "angle": -86.0}, {"time": 427.0, "angle": -86.0}, {"time": 428.0, "angle": 93.5}, {"time": 429.0, "angle": 93.5}, {"time": 430.0, "angle": 102.6}, {"time": 431.0, "angle": 102.6}, {"time": 432.0, "angle": 103.4}, {"time": 433.0, "angle": 103.4}, {"time": 434.0, "angle": 105.0}, {"time": 435.0, "angle": 105.0}, {"time": 436.0, "angle": 88.8}, {"time": 437.0, "angle": 88.8}, {"time": 438.0, "angle": 88.8}, {"time": 439.0, "angle": 88.8}, {"time": 440.0, "angle": 88.8}, {"time": 441.0, "angle": 88.8}, {"time": 442.0, "angle": 88.8}, {"time": 443.0, "angle": 88.8}, {"time": 444.0, "angle": 88.8}, {"time": 445.0, "angle": 88.8}, {"time": 446.0, "angle": 88.8}, {"time": 447.0, "angle": 88.8}, {"time": 448.0, "angle": 88.8}, {"time": 449.0, "angle": 88.8}, {"time": 450.0, "angle": 88.8}, {"time": 451.0, "angle": 88.8}, {"time": 452.0, "angle": 88.8}, {"time": 453.0, "angle": 88.8}, {"time": 454.0, "angle": 88.8}, {"time": 455.0, "angle": 88.8}, {"time": 456.0, "angle": 88.8}, {"time": 457.0, "angle": 88.8}, {"time": 458.0, "angle": 88.8}, {"time": 459.0, "angle": 88.8}, {"time": 460.0, "angle": 88.8}, {"time": 461.0, "angle": 88.8}, {"time": 462.0, "angle": 88.8}, {"time": 463.0, "angle": 88.8}, {"time": 464.0, "angle": 88.8}, {"time": 465.0, "angle": 88.8}, {"time": 466.0, "angle": 88.8}, {"time": 467.0, "angle": 88.8}, {"time": 468.0, "angle": 88.8}, {"time": 469.0, "angle": 88.8}, {"time": 470.0, "angle": 88.8}, {"time": 471.0, "angle": 88.8}, {"time": 472.0, "angle": 88.8}, {"time": 473.0, "angle": 88.8}, {"time": 474.0, "angle": 88.8}, {"time": 475.0, "angle": 88.8}, {"time": 476.0, "angle": 88.8}, {"time": 477.0, "angle": 88.8}, {"time": 478.0, "angle": 88.8}, {"time": 479.0, "angle": 88.8}, {"time": 480.0, "angle": 88.8}, {"time": 481.0, "angle": 88.8}, {"time": 482.0, "angle": 88.8}, {"time": 483.0, "angle": 88.8}, {"time": 484.0, "angle": 88.8}, {"time": 485.0, "angle": 88.8}, {"time": 486.0, "angle": 88.8}, {"time": 487.0, "angle": 88.8}, {"time": 488.0, "angle": 88.8}, {"time": 489.0, "angle": 88.8}, {"time": 490.0, "angle": 88.8}, {"time": 491.0, "angle": 88.8}, {"time": 492.0, "angle": 88.8}, {"time": 493.0, "angle": 88.8}, {"time": 494.0, "angle": 88.8}, {"time": 495.0, "angle": 88.8}, {"time": 496.0, "angle": 88.8}, {"time": 497.0, "angle": 88.8}, {"time": 498.0, "angle": 0.0}, {"time": 499.0, "angle": 0.0}, {"time": 500.0, "angle": 0.0}, {"time": 501.0, "angle": 0.0}, {"time": 502.0, "angle": 0.0}, {"time": 503.0, "angle": 0.0}, {"time": 504.0, "angle": 0.0}, {"time": 505.0, "angle": 0.0}, {"time": 506.0, "angle": 0.0}, {"time": 507.0, "angle": 0.0}, {"time": 508.0, "angle": 0.0}, {"time": 509.0, "angle": 0.0}, {"time": 510.0, "angle": 0.0}, {"time": 511.0, "angle": 0.0}, {"time": 512.0, "angle": 0.0}, {"time": 513.0, "angle": 0.0}, {"time": 514.0, "angle": 0.0}, {"time": 515.0, "angle": 0.0}, {"time": 516.0, "angle": 0.0}, {"time": 517.0, "angle": 0.0}, {"time": 518.0, "angle": 0.0}, {"time": 519.0, "angle": 0.0}, {"time": 520.0, "angle": 0.0}, {"time": 521.0, "angle": 0.0}, {"time": 522.0, "angle": 0.0}, {"time": 523.0, "angle": 0.0}, {"time": 524.0, "angle": 0.0}, {"time": 525.0, "angle": 0.0}, {"time": 526.0, "angle": 0.0}, {"time": 527.0, "angle": 0.0}, {"time": 528.0, "angle": 0.0}, {"time": 529.0, "angle": 0.0}, {"time": 530.0, "angle": 0.0}, {"time": 531.0, "angle": 0.0}, {"time": 532.0, "angle": 0.0}, {"time": 533.0, "angle": 0.0}, {"time": 534.0, "angle": 0.0}, {"time": 535.0, "angle": 0.0}, {"time": 536.0, "angle": 0.0}, {"time": 537.0, "angle": 0.0}, {"time": 538.0, "angle": 0.0}, {"time": 539.0, "angle": 0.0}, {"time": 540.0, "angle": 0.0}, {"time": 541.0, "angle": 0.0}, {"time": 542.0, "angle": 0.0}, {"time": 543.0, "angle": 0.0}, {"time": 544.0, "angle": 0.0}, {"time": 545.0, "angle": 0.0}, {"time": 546.0, "angle": 0.0}, {"time": 547.0, "angle": 0.0}, {"time": 548.0, "angle": 0.0}, {"time": 549.0, "angle": 0.0}, {"time": 550.0, "angle": 0.0}];
+
+        // Apollo 10 Real Trajectory Data (from flight records)
+        const APOLLO_10_REAL_ALTITUDE = [{"time": 1.85811, "altitude": 118.083}, {"time": 5.57432, "altitude": 112.761}, {"time": 9.29054, "altitude": 108.502}, {"time": 13.0068, "altitude": 103.711}, {"time": 16.723, "altitude": 99.4519}, {"time": 18.5811, "altitude": 95.7267}, {"time": 22.2973, "altitude": 92.5316}, {"time": 26.0135, "altitude": 88.8046}, {"time": 29.7297, "altitude": 85.6095}, {"time": 31.5878, "altitude": 82.4163}, {"time": 35.3041, "altitude": 80.285}, {"time": 37.1622, "altitude": 76.5598}, {"time": 40.8784, "altitude": 73.3647}, {"time": 46.4527, "altitude": 70.6998}, {"time": 50.1689, "altitude": 67.5047}, {"time": 53.8851, "altitude": 64.8415}, {"time": 57.6014, "altitude": 62.1783}, {"time": 61.3176, "altitude": 60.0471}, {"time": 63.1757, "altitude": 58.9815}, {"time": 65.0338, "altitude": 57.3839}, {"time": 66.8919, "altitude": 56.8502}, {"time": 70.6081, "altitude": 56.3147}, {"time": 74.3243, "altitude": 55.2473}, {"time": 78.0405, "altitude": 54.7118}, {"time": 81.7568, "altitude": 54.7082}, {"time": 85.473, "altitude": 54.7046}, {"time": 89.1892, "altitude": 55.7648}, {"time": 92.9054, "altitude": 56.2931}, {"time": 98.4797, "altitude": 57.3516}, {"time": 100.338, "altitude": 57.8817}, {"time": 107.77, "altitude": 58.4064}, {"time": 109.628, "altitude": 58.4046}, {"time": 115.203, "altitude": 58.9311}, {"time": 118.919, "altitude": 58.9275}, {"time": 122.635, "altitude": 58.392}, {"time": 130.068, "altitude": 57.321}, {"time": 135.642, "altitude": 57.3156}, {"time": 143.074, "altitude": 56.2446}, {"time": 148.649, "altitude": 55.7073}, {"time": 156.081, "altitude": 55.7001}, {"time": 161.655, "altitude": 55.6947}, {"time": 169.088, "altitude": 55.6875}, {"time": 178.378, "altitude": 56.2105}, {"time": 185.811, "altitude": 56.7352}, {"time": 191.385, "altitude": 57.2617}, {"time": 198.818, "altitude": 57.7864}, {"time": 206.25, "altitude": 58.8431}, {"time": 213.682, "altitude": 59.3678}, {"time": 222.973, "altitude": 59.3588}, {"time": 226.689, "altitude": 59.8871}, {"time": 234.122, "altitude": 59.88}, {"time": 243.412, "altitude": 60.4029}, {"time": 247.128, "altitude": 59.8674}, {"time": 250.845, "altitude": 59.3319}, {"time": 256.419, "altitude": 59.3265}, {"time": 261.993, "altitude": 58.7892}, {"time": 269.426, "altitude": 57.7182}, {"time": 271.284, "altitude": 57.1844}, {"time": 276.858, "altitude": 56.1152}, {"time": 282.432, "altitude": 55.5779}, {"time": 288.007, "altitude": 53.9768}, {"time": 293.581, "altitude": 52.9076}, {"time": 297.297, "altitude": 51.3082}, {"time": 304.73, "altitude": 49.7053}, {"time": 308.446, "altitude": 48.106}, {"time": 315.878, "altitude": 46.503}, {"time": 319.595, "altitude": 45.4356}, {"time": 321.453, "altitude": 43.8381}, {"time": 325.169, "altitude": 42.7706}, {"time": 330.743, "altitude": 41.7014}, {"time": 334.459, "altitude": 40.634}, {"time": 341.892, "altitude": 39.563}, {"time": 349.324, "altitude": 39.0239}, {"time": 353.041, "altitude": 37.9564}, {"time": 358.615, "altitude": 36.3553}, {"time": 364.189, "altitude": 35.2861}, {"time": 371.622, "altitude": 33.6832}, {"time": 373.48, "altitude": 33.1494}, {"time": 377.196, "altitude": 32.6139}, {"time": 382.77, "altitude": 30.4809}, {"time": 390.203, "altitude": 28.8779}, {"time": 395.777, "altitude": 27.8087}, {"time": 403.209, "altitude": 25.6739}, {"time": 410.642, "altitude": 24.6029}, {"time": 416.216, "altitude": 23.0017}, {"time": 421.791, "altitude": 21.9325}, {"time": 429.223, "altitude": 20.3296}, {"time": 431.081, "altitude": 18.732}, {"time": 438.514, "altitude": 16.5972}, {"time": 445.946, "altitude": 15.5262}, {"time": 453.378, "altitude": 14.4551}, {"time": 458.953, "altitude": 12.854}, {"time": 464.527, "altitude": 11.7848}, {"time": 468.243, "altitude": 11.2493}, {"time": 475.676, "altitude": 9.64635}, {"time": 483.108, "altitude": 8.57533}, {"time": 488.682, "altitude": 7.50611}, {"time": 497.973, "altitude": 6.43329}, {"time": 503.547, "altitude": 5.89599}, {"time": 512.838, "altitude": 4.82317}, {"time": 518.412, "altitude": 4.28587}, {"time": 523.986, "altitude": 3.21665}, {"time": 531.419, "altitude": 3.20946}, {"time": 538.851, "altitude": 3.20227}, {"time": 542.568, "altitude": 2.13485}, {"time": 550.0, "altitude": 1.06383}];
+
+        const APOLLO_10_REAL_VELOCITY = [{"time": 19.6721, "velocity": 11.0962}, {"time": 33.4426, "velocity": 11.0962}, {"time": 41.3115, "velocity": 11.046}, {"time": 47.2131, "velocity": 10.9958}, {"time": 53.1148, "velocity": 10.8954}, {"time": 57.0492, "velocity": 10.7448}, {"time": 62.9508, "velocity": 10.5941}, {"time": 66.8852, "velocity": 10.4435}, {"time": 70.8197, "velocity": 10.1925}, {"time": 72.7869, "velocity": 9.94142}, {"time": 74.7541, "velocity": 9.74059}, {"time": 78.6885, "velocity": 9.48954}, {"time": 84.5902, "velocity": 9.23849}, {"time": 86.5574, "velocity": 9.08787}, {"time": 92.459, "velocity": 8.78661}, {"time": 98.3607, "velocity": 8.53556}, {"time": 104.262, "velocity": 8.28452}, {"time": 112.131, "velocity": 8.03347}, {"time": 118.033, "velocity": 7.88285}, {"time": 125.902, "velocity": 7.6318}, {"time": 131.803, "velocity": 7.48117}, {"time": 141.639, "velocity": 7.23013}, {"time": 149.508, "velocity": 7.02929}, {"time": 159.344, "velocity": 6.77824}, {"time": 169.18, "velocity": 6.42678}, {"time": 177.049, "velocity": 6.27615}, {"time": 184.918, "velocity": 6.0251}, {"time": 192.787, "velocity": 5.82427}, {"time": 202.623, "velocity": 5.67364}, {"time": 214.426, "velocity": 5.57322}, {"time": 224.262, "velocity": 5.4728}, {"time": 238.033, "velocity": 5.37238}, {"time": 247.869, "velocity": 5.27197}, {"time": 259.672, "velocity": 5.17155}, {"time": 267.541, "velocity": 5.02092}, {"time": 275.41, "velocity": 4.9205}, {"time": 283.279, "velocity": 4.82008}, {"time": 293.115, "velocity": 4.66946}, {"time": 300.984, "velocity": 4.46862}, {"time": 306.885, "velocity": 4.21757}, {"time": 312.787, "velocity": 4.01674}, {"time": 316.721, "velocity": 3.91632}, {"time": 322.623, "velocity": 3.66527}, {"time": 328.525, "velocity": 3.46444}, {"time": 334.426, "velocity": 3.16318}, {"time": 338.361, "velocity": 2.91213}, {"time": 342.295, "velocity": 2.7113}, {"time": 346.23, "velocity": 2.46025}, {"time": 354.098, "velocity": 2.20921}, {"time": 356.066, "velocity": 2.05858}, {"time": 363.934, "velocity": 1.85774}, {"time": 369.836, "velocity": 1.60669}, {"time": 373.77, "velocity": 1.45607}, {"time": 381.639, "velocity": 1.20502}, {"time": 387.541, "velocity": 1.00418}, {"time": 391.475, "velocity": 0.953975}, {"time": 399.344, "velocity": 0.803347}, {"time": 407.213, "velocity": 0.65272}, {"time": 419.016, "velocity": 0.502092}, {"time": 430.82, "velocity": 0.401674}, {"time": 434.754, "velocity": 0.351464}, {"time": 442.623, "velocity": 0.301255}, {"time": 452.459, "velocity": 0.251046}, {"time": 462.295, "velocity": 0.200837}, {"time": 474.098, "velocity": 0.200837}, {"time": 485.902, "velocity": 0.200837}, {"time": 493.77, "velocity": 0.200837}, {"time": 503.607, "velocity": 0.200837}, {"time": 521.311, "velocity": 0.150628}, {"time": 535.082, "velocity": 0.150628}, {"time": 546.885, "velocity": 0.150628}, {"time": 550.82, "velocity": 0.150628}];
+
+        // Bank mode switching
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize canvas for visual mode
+            canvas = document.getElementById('bankProfileCanvas');
+            if (canvas) {
+                ctx = canvas.getContext('2d');
+            }
+
+            // Mode button handlers
+            document.querySelectorAll('.bank-mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.bank-mode-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.bank-mode-content').forEach(c => c.style.display = 'none');
+                    
+                    btn.classList.add('active');
+                    currentBankMode = btn.dataset.mode;
+                    document.getElementById(currentBankMode + 'Mode').style.display = 'block';
+                    
+                    // Set Apollo 10 initial conditions when Apollo button is pressed
+                    if (currentBankMode === 'apollo10') {
+                        useApollo10InitialConditions = true;
+                        // Update UI sliders to reflect Apollo 10 values
+                        document.getElementById('velocity').value = apollo10InitialConditions.velocity;
+                        document.getElementById('velocity-value').textContent = apollo10InitialConditions.velocity.toFixed(3) + ' km/s';
+                        document.getElementById('fpa').value = apollo10InitialConditions.fpa;
+                        document.getElementById('fpa-value').textContent = apollo10InitialConditions.fpa.toFixed(1) + '°';
+                        document.getElementById('ld').value = apollo10InitialConditions.ld;
+                        document.getElementById('ld-value').textContent = apollo10InitialConditions.ld.toFixed(2);
+                        document.getElementById('cd').value = apollo10InitialConditions.cd;
+                        document.getElementById('cd-value').textContent = apollo10InitialConditions.cd.toFixed(1);
+                        document.getElementById('sref').value = apollo10InitialConditions.area;
+                        document.getElementById('sref-value').textContent = apollo10InitialConditions.area.toFixed(0) + ' m²';
+                        document.getElementById('mass').value = apollo10InitialConditions.mass;
+                        document.getElementById('mass-value').textContent = apollo10InitialConditions.mass.toFixed(0) + ' kg';
+                        
+                        // Show indicator
+                        showApollo10Indicator();
+                    } else {
+                        useApollo10InitialConditions = false;
+                        hideApollo10Indicator();
+                    }
+                    
+                    // Initialize canvas when visual mode is selected
+                    if (currentBankMode === 'visual' && canvas) {
+                        setTimeout(() => {
+                            const rect = canvas.getBoundingClientRect();
+                            canvas.width = rect.width;
+                            canvas.height = rect.height;
+                            drawGrid();
+                            
+                            // Remove old listeners to prevent duplicates
+                            canvas.removeEventListener('mousedown', startDrawing);
+                            canvas.removeEventListener('mousemove', draw);
+                            canvas.removeEventListener('mouseup', stopDrawing);
+                            canvas.removeEventListener('mouseleave', stopDrawing);
+                            
+                            // Add listeners
+                            canvas.addEventListener('mousedown', startDrawing);
+                            canvas.addEventListener('mousemove', draw);
+                            canvas.addEventListener('mouseup', stopDrawing);
+                            canvas.addEventListener('mouseleave', stopDrawing);
+                        }, 50);
+                    }
+                    
+                    runSimulation();
+                });
+            });
+
+            // Waypoint handlers
+            document.getElementById('addWaypoint').addEventListener('click', () => {
+                const lastTime = waypoints.length > 0 ? waypoints[waypoints.length - 1].time : 0;
+                waypoints.push({ time: lastTime + 50, angle: 0 });
+                waypoints.sort((a, b) => a.time - b.time);
+                updateWaypointList();
+                runSimulation();
+            });
+
+            // Canvas buttons
+            document.getElementById('clearCanvas').addEventListener('click', () => {
+                visualProfile = [];
+                drawGrid();
+                runSimulation();
+            });
+
+            document.getElementById('smoothCanvas').addEventListener('click', () => {
+                if (visualProfile.length < 3) return;
+                const smoothed = [];
+                const windowSize = 5;
+                for (let i = 0; i < visualProfile.length; i++) {
+                    const start = Math.max(0, i - Math.floor(windowSize / 2));
+                    const end = Math.min(visualProfile.length, i + Math.ceil(windowSize / 2));
+                    let sumAngle = 0;
+                    for (let j = start; j < end; j++) {
+                        sumAngle += visualProfile[j].angle;
+                    }
+                    smoothed.push({
+                        time: visualProfile[i].time,
+                        angle: sumAngle / (end - start)
+                    });
+                }
+                visualProfile = smoothed;
+                drawGrid();
+                runSimulation();
+            });
+
+            // CSV handler
+            document.getElementById('applyCSV').addEventListener('click', () => {
+                const csvText = document.getElementById('csvInput').value;
+                const lines = csvText.trim().split('\n');
+                const newWaypoints = [];
+                for (const line of lines) {
+                    // Split by whitespace (space or tab) instead of comma
+                    const parts = line.trim().split(/\s+/).filter(p => p.length > 0);
+                    if (parts.length >= 2) {
+                        const time = parseFloat(parts[0]);
+                        const angle = parseFloat(parts[1]);
+                        if (!isNaN(time) && !isNaN(angle)) {
+                            newWaypoints.push({ time, angle });
+                        }
+                    }
+                }
+                if (newWaypoints.length >= 2) {
+                    waypoints = newWaypoints.sort((a, b) => a.time - b.time);
+                    updateWaypointList();
+                    alert('CSV data applied successfully!');
+                    runSimulation();
+                } else {
+                    alert('Error: CSV must contain at least 2 valid waypoints');
+                }
+            });
+
+            // Initialize waypoint list
+            updateWaypointList();
+        });
+
+        // Waypoint management
+        function updateWaypointList() {
+            const list = document.getElementById('waypointList');
+            list.innerHTML = '';
+            waypoints.forEach((wp, i) => {
+                const item = document.createElement('div');
+                item.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px; align-items: center; padding: 4px; background: var(--secondary-bg); border-radius: 3px; margin-bottom: 3px; font-size: 0.65rem;';
+                item.innerHTML = `
+                    <input type="number" value="${wp.time}" min="0" max="2000" step="10" 
+                           style="padding: 3px; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 3px; color: var(--text-primary); font-family: 'Roboto Mono', monospace; font-size: 0.6rem;" 
+                           onchange="waypoints[${i}].time = parseFloat(this.value); waypoints.sort((a, b) => a.time - b.time); updateWaypointList(); runSimulation();" placeholder="Time (s)">
+                    <input type="number" value="${wp.angle}" min="-90" max="180" step="5" 
+                           style="padding: 3px; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 3px; color: var(--text-primary); font-family: 'Roboto Mono', monospace; font-size: 0.6rem;" 
+                           onchange="waypoints[${i}].angle = parseFloat(this.value); runSimulation();" placeholder="Angle (°)">
+                    <button onclick="if(waypoints.length > 2) { waypoints.splice(${i}, 1); updateWaypointList(); runSimulation(); }" 
+                            style="padding: 3px 6px; background: #ff4444; border: none; border-radius: 3px; color: white; cursor: pointer; font-size: 0.6rem;" 
+                            ${waypoints.length <= 2 ? 'disabled' : ''}>×</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // Visual editor functions
+        function drawGrid() {
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = (canvas.height / 4) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            for (let i = 0; i <= 10; i++) {
+                const x = (canvas.width / 10) * i;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#9aa0a6';
+            ctx.font = '9px Roboto Mono';
+            ctx.fillText('180°', 3, 12);
+            ctx.fillText('0°', 3, canvas.height / 2 + 4);
+            ctx.fillText('-90°', 3, canvas.height - 4);
+            if (visualProfile.length > 0) {
+                ctx.strokeStyle = '#00d9ff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                visualProfile.forEach((point, i) => {
+                    const x = (point.time / 2500) * canvas.width;
+                    const y = ((180 - point.angle) / 270) * canvas.height;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+            }
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            visualProfile = [];
+            draw(e);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const time = (x / canvas.width) * 2500;
+            const angle = 180 - (y / canvas.height) * 270;
+            visualProfile.push({ time, angle });
+            drawGrid();
+        }
+
+        function stopDrawing() {
+            if (isDrawing) {
+                isDrawing = false;
+                runSimulation();
+            }
+        }
+
+        // Interpolation helper
+        function interpolateWaypoints(t, points) {
+            if (points.length === 0) return 0;
+            if (points.length === 1) return points[0].angle;
+            if (t <= points[0].time) return points[0].angle;
+            if (t >= points[points.length - 1].time) return points[points.length - 1].angle;
+            for (let i = 0; i < points.length - 1; i++) {
+                if (t >= points[i].time && t <= points[i + 1].time) {
+                    const fraction = (t - points[i].time) / (points[i + 1].time - points[i].time);
+                    return points[i].angle + fraction * (points[i + 1].angle - points[i].angle);
+                }
+            }
+            return points[points.length - 1].angle;
+        }
+
+        // Function to get bank angle based on profile selection
+        function getBankAngle(time) {
+            switch (currentBankMode) {
+                case 'constant':
+                    return -parseFloat(document.getElementById('bank').value);
+                case 'piecewise':
+                    return interpolateWaypoints(time, waypoints);
+                case 'visual':
+                    if (visualProfile.length < 2) return 0;
+                    return interpolateWaypoints(time, visualProfile);
+                case 'csv':
+                    return interpolateWaypoints(time, waypoints);
+                case 'apollo10':
+                    return interpolateWaypoints(time, APOLLO_10_PROFILE);
+                default:
+                    return 0;
+            }
+        }
+
+        // Toggle event listener
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('peak-indicator-toggle').addEventListener('change', () => {
+                updateCharts(charts.timeData, charts.altitudeData, charts.velocityData, charts.decelData, charts.heatFluxData, charts.fpaData, charts.downrangeData, charts.crossrangeData, charts.bankAngleData);
+            });
+        });
+
+        // Apollo 10 Indicator Functions
+        function showApollo10Indicator() {
+            const indicator = document.getElementById('apollo10Indicator');
+            if (indicator) {
+                indicator.style.display = 'block';
+            }
+        }
+
+        function hideApollo10Indicator() {
+            const indicator = document.getElementById('apollo10Indicator');
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
+        }
+
+        // ============================================================================
+        // APOLLO 10 PHYSICS MODEL - CONSTANTS AND FUNCTIONS
+        // ============================================================================
+        
+        // Physical constants (Apollo 10 model)
+        const CONSTANTS_APOLLO = {
+            beta: 0.14,                  // Atmospheric scale height [km⁻¹]
+            rho_s: 1.225,                // Density at sea level [kg/m³]
+            r_s: 6378.137,               // Earth radius [km]
+            g_s: 9.81 / 1000,            // Gravity at sea level [km/s²]
+            r_0: 6500                    // Reference radius for gravity [km]
+        };
+
+        // Constants for other calculations (kept from original)
+        const R_EARTH = 6378.137; // km
+        const RHO_SEA = 1.225; // kg/m^3
+        const G = 6.674e-11; // m^3/(kg*s^2)
+        const M_EARTH = 5.972e24; // kg
+        const V_SEA = Math.sqrt(G * M_EARTH / (R_EARTH * 1000)) / 1000; // km/s
+
+        // Atmospheric density model (Apollo 10 exponential model)
+        function atmosphericDensity(h_km) {
+            // Input: h_km = altitude above sea level in km
+            // Output: density in kg/m³
+            const r_km = CONSTANTS_APOLLO.r_s + h_km;
+            const rho = CONSTANTS_APOLLO.rho_s * Math.exp(-CONSTANTS_APOLLO.beta * (r_km - CONSTANTS_APOLLO.r_s));
+            return rho; // kg/m³
+        }
+
+        // Gravity model (Apollo 10 inverse square law)
+        function gravity(r_km) {
+            // Input: r_km = radius in km
+            // Output: gravitational acceleration in km/s²
+            const g_0 = CONSTANTS_APOLLO.g_s;
+            const r_0 = CONSTANTS_APOLLO.r_0;
+            return g_0 * (r_0 / r_km) * (r_0 / r_km); // km/s²
+        }
+
+        // Heat flux calculation (KEPT FROM ORIGINAL - NOT IN APOLLO MODEL)
+        function heatFlux(rho, V) {
+            return 199830 * Math.pow(rho / RHO_SEA, 0.5) * Math.pow(V / V_SEA, 3.15) * 1000;
+        }
+
+        // Stagnation temperature (KEPT FROM ORIGINAL - NOT IN APOLLO MODEL)
+        function stagnationTemp(V) {
+            const gamma = 1.4;
+            const R = 287; // J/(kg*K)
+            const T_inf = 288; // K (atmospheric temp)
+            return T_inf * (1 + ((gamma - 1) / 2) * Math.pow(V * 1000 / Math.sqrt(gamma * R * T_inf), 2));
+        }
+
+        // ============================================================================
+        // RK5 INTEGRATION (Cash-Karp) - Apollo 10 Model
+        // ============================================================================
+        function rk5Step(t, state, dt, derivFunc, vehicleParams) {
+            // Cash-Karp coefficients
+            const a2 = 1/5, a3 = 3/10, a4 = 3/5, a5 = 1, a6 = 7/8;
+            
+            const b21 = 1/5;
+            const b31 = 3/40, b32 = 9/40;
+            const b41 = 3/10, b42 = -9/10, b43 = 6/5;
+            const b51 = -11/54, b52 = 5/2, b53 = -70/27, b54 = 35/27;
+            const b61 = 1631/55296, b62 = 175/512, b63 = 575/13824, 
+                  b64 = 44275/110592, b65 = 253/4096;
+            
+            const c1 = 37/378, c3 = 250/621, c4 = 125/594, c6 = 512/1771;
+            
+            // k1
+            const k1 = derivFunc(t, state, vehicleParams);
+            
+            // k2
+            const state2 = state.map((s, i) => s + dt * b21 * k1[i]);
+            const k2 = derivFunc(t + a2 * dt, state2, vehicleParams);
+            
+            // k3
+            const state3 = state.map((s, i) => s + dt * (b31 * k1[i] + b32 * k2[i]));
+            const k3 = derivFunc(t + a3 * dt, state3, vehicleParams);
+            
+            // k4
+            const state4 = state.map((s, i) => s + dt * (b41 * k1[i] + b42 * k2[i] + b43 * k3[i]));
+            const k4 = derivFunc(t + a4 * dt, state4, vehicleParams);
+            
+            // k5
+            const state5 = state.map((s, i) => s + dt * (b51 * k1[i] + b52 * k2[i] + 
+                                                           b53 * k3[i] + b54 * k4[i]));
+            const k5 = derivFunc(t + a5 * dt, state5, vehicleParams);
+            
+            // k6
+            const state6 = state.map((s, i) => s + dt * (b61 * k1[i] + b62 * k2[i] + 
+                                                           b63 * k3[i] + b64 * k4[i] + b65 * k5[i]));
+            const k6 = derivFunc(t + a6 * dt, state6, vehicleParams);
+            
+            // 5th order solution
+            const newState = state.map((s, i) => 
+                s + dt * (c1 * k1[i] + c3 * k3[i] + c4 * k4[i] + c6 * k6[i])
+            );
+            
+            return newState;
+        }
+
+        // ============================================================================
+        // EQUATIONS OF MOTION - Apollo 10 3-DOF Model
+        // ============================================================================
+        function equationsOfMotion(t, state, vehicleParams) {
+            // STATE VECTOR: [r, theta, phi, V, gamma, psi]
+            // r:     Radial distance from Earth center [km]
+            // theta: Longitude (East positive) [rad]
+            // phi:   Latitude (North positive) [rad]
+            // V:     Velocity magnitude [km/s]
+            // gamma: Flight path angle [rad] (positive = climbing, negative = descending)
+            // psi:   Heading angle [rad] (0 = North, 90° = East, 180° = South, 270° = West)
+            
+            const [r, theta, phi, V, gamma, psi] = state;
+            
+            // Get bank angle (control input) in radians
+            const sigma_deg = getBankAngle(t);
+            const sigma = sigma_deg * Math.PI / 180.0;
+            
+            // Atmospheric density (convert to kg/km³ for consistent units)
+            const h = r - CONSTANTS_APOLLO.r_s;
+            const rho = atmosphericDensity(h) * 1e9; // kg/m³ to kg/km³
+            
+            // Gravity
+            const g = gravity(r); // km/s²
+            
+            // Vehicle parameters
+            const m = vehicleParams.mass;
+            const S = vehicleParams.S_ref / 1e6; // m² to km²
+            const C_L = vehicleParams.CL;
+            const C_D = vehicleParams.CD;
+            
+            // Aerodynamic accelerations (specific forces)
+            const drag_accel = -rho * C_D * S * V * V / (2 * m);  // km/s² (negative)
+            const lift_accel = rho * C_L * S * V * V / (2 * m);   // km/s² (positive)
+            
+            // Equation (1): dr/dt = V * sin(γ)
+            const r_dot = V * Math.sin(gamma);
+            
+            // Equation (2): dθ/dt = V * cos(γ) * cos(ψ) / (r * cos(φ))
+            const theta_dot = V * Math.cos(gamma) * Math.cos(psi) / (r * Math.cos(phi));
+            
+            // Equation (3): dφ/dt = V * cos(γ) * sin(ψ) / r
+            const phi_dot = V * Math.cos(gamma) * Math.sin(psi) / r;
+            
+            // Equation (4): dV/dt = drag - g * sin(γ)
+            const V_dot = drag_accel - g * Math.sin(gamma);
+            
+            // Equation (5): dγ/dt = (1/V) * [lift * cos(σ) + (V²/r - g) * cos(γ)]
+            const gamma_dot = (1 / V) * (lift_accel * Math.cos(sigma) + 
+                                          (V * V / r - g) * Math.cos(gamma));
+            
+            // Equation (6): dψ/dt = (1/V) * [lift * sin(σ) / cos(γ) - V²/r * cos(γ) * cos(ψ) * tan(φ)]
+            const psi_dot = (1 / V) * (lift_accel * Math.sin(sigma) / Math.cos(gamma) - 
+                                        V * V / r * Math.cos(gamma) * Math.cos(psi) * Math.tan(phi));
+            
+            return [r_dot, theta_dot, phi_dot, V_dot, gamma_dot, psi_dot];
+        }
+
+        function runSimulation() {
+            // Get input parameters - use Apollo 10 values if that mode is active
+            let mass, V0, fpa0_deg, LD, CD, S_ref, psi0_deg, phi0, theta0;
+            
+            if (useApollo10InitialConditions) {
+                // Apollo 10 initial conditions
+                mass = apollo10InitialConditions.mass;
+                V0 = apollo10InitialConditions.velocity;
+                fpa0_deg = apollo10InitialConditions.fpa;
+                LD = apollo10InitialConditions.ld;
+                CD = apollo10InitialConditions.cd;
+                S_ref = apollo10InitialConditions.area;
+                psi0_deg = apollo10InitialConditions.azimuth;
+                phi0 = apollo10InitialConditions.latitude * Math.PI / 180;  // latitude in radians
+                theta0 = apollo10InitialConditions.longitude * Math.PI / 180;  // longitude in radians
+            } else {
+                // Standard initial conditions from sliders
+                mass = parseFloat(document.getElementById('mass').value);
+                V0 = parseFloat(document.getElementById('velocity').value);
+                fpa0_deg = parseFloat(document.getElementById('fpa').value);
+                LD = parseFloat(document.getElementById('ld').value);
+                CD = parseFloat(document.getElementById('cd').value);
+                S_ref = parseFloat(document.getElementById('sref').value);
+                psi0_deg = 35.0;  // Fixed heading angle: 35° (northeast over U.S.)
+                phi0 = 34.0 * Math.PI / 180;  // latitude: 34°N
+                theta0 = -122.5 * Math.PI / 180;  // longitude: 122.5°W
+            }
+
+            // Convert to radians
+            const gamma0 = fpa0_deg * Math.PI / 180;  // flight path angle
+            const psi0 = psi0_deg * Math.PI / 180;  // heading angle
+
+            // Initial conditions
+            const h0 = useApollo10InitialConditions ? 120.125 : 120; // km entry altitude
+            const r0 = R_EARTH + h0;
+
+            // Aerodynamic coefficients
+            const CL = CD * LD;
+
+            // Vehicle parameters object
+            const vehicleParams = {
+                mass: mass,
+                S_ref: S_ref,
+                CD: CD,
+                CL: CL
+            };
+
+            // Initialize state vector: [r, theta, phi, V, gamma, psi]
+            let state = [r0, theta0, phi0, V0, gamma0, psi0];
+            
+            // Simulation parameters
+            const dt = 0.1; // time step (seconds)
+            const maxTime = 2500; // maximum simulation time (seconds)
+            
+            // Storage arrays
+            const time = [];
+            const altitude = [];
+            const velocity = [];
+            const deceleration = [];
+            const heatFluxData = [];
+            const fpaData = [];
+            const downrange = [];
+            const crossrange = [];
+            const bankAngleData = [];
+            const latitudeData = [];
+            const longitudeData = [];
+
+            let t = 0;
+            let maxDecel = 0;
+            let maxHeat = 0;
+            let maxHeatAlt = 0;
+            let maxTemp = 0;
+            let maxHeatIndex = 0;
+            let currentIndex = 0;
+            
+            // Reset peak heat tracking
+            peakHeatTime = 0;
+            peakHeatAltitude = 0;
+            
+            // === EARTH-AGNOSTIC DOWNRANGE/CROSSRANGE SETUP ===
+            // Convert initial position to ECEF (Earth-Centered Earth-Fixed)
+            const r0_ecef_x = r0 * Math.cos(phi0) * Math.cos(theta0);
+            const r0_ecef_y = r0 * Math.cos(phi0) * Math.sin(theta0);
+            const r0_ecef_z = r0 * Math.sin(phi0);
+            
+            // Initial velocity vector in ECEF (will compute after first step)
+            let v0_ecef_x = null;
+            let v0_ecef_y = null;
+            let v0_ecef_z = null;
+            
+            // Orbital plane normal vector (n = r0 × v0)
+            let plane_normal_x = null;
+            let plane_normal_y = null;
+            let plane_normal_z = null;
+            
+            // Local tangent plane basis vectors (computed after first step)
+            let u_hat_x = null, u_hat_y = null, u_hat_z = null; // Up
+            let d_hat_x = null, d_hat_y = null, d_hat_z = null; // Downrange
+            let c_hat_x = null, c_hat_y = null, c_hat_z = null; // Crossrange
+            let basisComputed = false;
+
+            // Integration loop using RK5
+            while (t < maxTime && state[0] > R_EARTH && state[0] < R_EARTH + 200) {
+                const r = state[0];
+                const theta = state[1];
+                const phi = state[2];
+                const V = state[3];
+                const gamma = state[4];
+                const psi = state[5];
+                
+                const h = r - R_EARTH;
+                
+                if (h < 0) break;
+
+                // Get current bank angle
+                const mu = getBankAngle(t);
+                // Calculate metrics at current state before updating
+                const rho = atmosphericDensity(h);
+                
+                // Calculate deceleration using current velocity derivative
+                const derivs = equationsOfMotion(t, state, vehicleParams);
+                const V_dot = derivs[3];
+                const decel_g = Math.abs(V_dot) / (9.81e-3);  // Convert to gs
+                
+                const heat = heatFlux(rho, V);
+                const temp = stagnationTemp(V);
+                
+                // === ORBITAL PLANE DOWNRANGE/CROSSRANGE CALCULATION ===
+                // Convert current position to ECEF
+                const r_ecef_x = r * Math.cos(phi) * Math.cos(theta);
+                const r_ecef_y = r * Math.cos(phi) * Math.sin(theta);
+                const r_ecef_z = r * Math.sin(phi);
+                
+                // Compute orbital plane after first step (when we have velocity)
+                if (!basisComputed && currentIndex > 0) {
+                    // Get previous position to estimate velocity vector
+                    const prev_r = R_EARTH + altitude[currentIndex - 1];
+                    const prev_phi = phi - derivs[2] * dt;
+                    const prev_theta = theta - derivs[1] * dt;
+                    
+                    const prev_x = prev_r * Math.cos(prev_phi) * Math.cos(prev_theta);
+                    const prev_y = prev_r * Math.cos(prev_phi) * Math.sin(prev_theta);
+                    const prev_z = prev_r * Math.sin(prev_phi);
+                    
+                    // Initial velocity vector in ECEF
+                    v0_ecef_x = r0_ecef_x - prev_x;
+                    v0_ecef_y = r0_ecef_y - prev_y;
+                    v0_ecef_z = r0_ecef_z - prev_z;
+                    
+                    // Orbital plane normal: n = r0 × v0
+                    plane_normal_x = r0_ecef_y * v0_ecef_z - r0_ecef_z * v0_ecef_y;
+                    plane_normal_y = r0_ecef_z * v0_ecef_x - r0_ecef_x * v0_ecef_z;
+                    plane_normal_z = r0_ecef_x * v0_ecef_y - r0_ecef_y * v0_ecef_x;
+                    
+                    // Normalize plane normal
+                    const n_mag = Math.sqrt(plane_normal_x**2 + plane_normal_y**2 + plane_normal_z**2);
+                    plane_normal_x /= n_mag;
+                    plane_normal_y /= n_mag;
+                    plane_normal_z /= n_mag;
+                    
+                    basisComputed = true;
+                }
+                
+                // Compute downrange and crossrange relative to orbital plane
+                let dr = 0;
+                let cr = 0;
+                
+                if (basisComputed) {
+                    // Crossrange = perpendicular distance from orbital plane
+                    // Distance from point to plane: |r · n|
+                    cr = Math.abs(r_ecef_x * plane_normal_x + 
+                                  r_ecef_y * plane_normal_y + 
+                                  r_ecef_z * plane_normal_z);
+                    
+                    // Downrange = arc length traveled along the orbital plane
+                    // Project current position onto the plane
+                    const proj_x = r_ecef_x - cr * plane_normal_x;
+                    const proj_y = r_ecef_y - cr * plane_normal_y;
+                    const proj_z = r_ecef_z - cr * plane_normal_z;
+                    
+                    // Compute angle between initial position and projected position
+                    const dot_product = r0_ecef_x * proj_x + r0_ecef_y * proj_y + r0_ecef_z * proj_z;
+                    const r0_mag = Math.sqrt(r0_ecef_x**2 + r0_ecef_y**2 + r0_ecef_z**2);
+                    const proj_mag = Math.sqrt(proj_x**2 + proj_y**2 + proj_z**2);
+                    
+                    const cos_angle = dot_product / (r0_mag * proj_mag);
+                    const angle = Math.acos(Math.max(-1, Math.min(1, cos_angle))); // Clamp for numerical stability
+                    
+                    // Arc length = angle * radius
+                    dr = angle * R_EARTH;
+                }
+                // === END ORBITAL PLANE CALCULATION ===
+
+                // Track peak metrics
+                if (decel_g > maxDecel) maxDecel = decel_g;
+                if (heat > maxHeat) {
+                    maxHeat = heat;
+                    maxHeatAlt = h;
+                    maxTemp = temp;
+                    maxHeatIndex = currentIndex;
+                    peakHeatTime = t;
+                    peakHeatAltitude = h;
+                }
+
+                // Store data
+                time.push(t);
+                altitude.push(h);
+                velocity.push(V);
+                deceleration.push(decel_g);
+                heatFluxData.push(heat);
+                fpaData.push(gamma * 180 / Math.PI);  // Convert to degrees
+                downrange.push(dr);
+                crossrange.push(cr);
+                bankAngleData.push(getBankAngle(t));
+                latitudeData.push(phi * 180 / Math.PI);  // Convert to degrees
+                longitudeData.push(theta * 180 / Math.PI);  // Convert to degrees
+
+                currentIndex++;
+
+                // Integrate one step using RK5 (Cash-Karp)
+                state = rk5Step(t, state, dt, equationsOfMotion, vehicleParams);
+
+                t += dt;
+
+                // Safety checks
+                if (state[3] <= 0 || isNaN(state[3]) || isNaN(state[0])) break;
+            }
+
+            // Set peak heat flux time and altitude from the stored index
+            peakHeatTime = time[maxHeatIndex];
+            peakHeatAltitude = altitude[maxHeatIndex];
+            
+            console.log('=== SIMULATION COMPLETE ===');
+            console.log('Max Heat Index:', maxHeatIndex);
+            console.log('Peak Heat Time:', peakHeatTime, 'seconds');
+            console.log('Peak Heat Altitude:', peakHeatAltitude, 'km');
+            console.log('Max Heat Flux:', maxHeat, 'W/m²');
+            console.log('Time array length:', time.length);
+            console.log('Time at index', maxHeatIndex, ':', time[maxHeatIndex]);
+            console.log('Heat flux at index', maxHeatIndex, ':', heatFluxData[maxHeatIndex]);
+
+            // Update metrics display
+            document.getElementById('max-decel').innerHTML = `${maxDecel.toFixed(1)}<span class="metric-unit">g</span>`;
+            
+            // Format peak heat with commas
+            const peakHeatValue = (maxHeat / 1000).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+            document.getElementById('peak-heat').innerHTML = `${peakHeatValue}<span class="metric-unit">kW/m²</span>`;
+            
+            document.getElementById('heat-alt').innerHTML = `${maxHeatAlt.toFixed(1)}<span class="metric-unit">km</span>`;
+            
+            // Convert Kelvin to Fahrenheit: °F = (K - 273.15) × 9/5 + 32
+            const maxTempF = (maxTemp - 273.15) * 9/5 + 32;
+            const tempFormatted = Math.round(maxTempF).toLocaleString('en-US');
+            document.getElementById('stag-temp').innerHTML = `${tempFormatted}<span class="metric-unit">°F</span>`;
+
+            // Store data for toggle functionality
+            charts.timeData = time;
+            charts.altitudeData = altitude;
+            charts.velocityData = velocity;
+            charts.decelData = deceleration;
+            charts.heatFluxData = heatFluxData;
+            charts.fpaData = fpaData;
+            charts.downrangeData = downrange;
+            charts.crossrangeData = crossrange;
+            charts.latitudeData = latitudeData;
+            charts.longitudeData = longitudeData;
+            
+            // Store orbital plane normal for visualization
+            charts.orbitalPlaneNormal = {
+                x: plane_normal_x,
+                y: plane_normal_y,
+                z: plane_normal_z
+            };
+            charts.initialPosition = {
+                x: r0_ecef_x,
+                y: r0_ecef_y,
+                z: r0_ecef_z
+            };
+
+            // Update charts
+            updateCharts(time, altitude, velocity, deceleration, heatFluxData, fpaData, downrange, crossrange, bankAngleData);
+        }
+
+        function updateCharts(time, altitude, velocity, deceleration, heatFlux, fpa, downrange, crossrange, bankAngle) {
+            // Store in charts object for peak indicator toggle
+            charts.timeData = time;
+            charts.altitudeData = altitude;
+            charts.velocityData = velocity;
+            charts.decelData = deceleration;
+            charts.heatFluxData = heatFlux;
+            charts.fpaData = fpa;
+            charts.downrangeData = downrange;
+            charts.crossrangeData = crossrange;
+            charts.bankAngleData = bankAngle;
+            
+            const showIndicators = document.getElementById('peak-indicator-toggle').checked;
+            
+            console.log('=== UPDATE CHARTS ===');
+            console.log('peakHeatTime from global:', peakHeatTime);
+            console.log('peakHeatAltitude from global:', peakHeatAltitude);
+            console.log('showIndicators:', showIndicators);
+            
+            // Find the actual max in the heat flux data to verify
+            let actualMaxHeat = 0;
+            let actualMaxIndex = 0;
+            for (let i = 0; i < heatFlux.length; i++) {
+                if (heatFlux[i] > actualMaxHeat) {
+                    actualMaxHeat = heatFlux[i];
+                    actualMaxIndex = i;
+                }
+            }
+            console.log('Actual max heat flux:', actualMaxHeat, 'at index:', actualMaxIndex, 'time:', time[actualMaxIndex]);
+            
+            // Get min and max time for synchronized x-axes
+            const minTime = Math.min(...time);
+            const maxTime = Math.max(...time);
+            
+            // Pre-calculate exact tick positions to force alignment
+            const timeRange = maxTime - minTime;
+            const stepSize = Math.ceil(timeRange / 8); // Aim for ~8-10 ticks
+            
+            // Create a shared x-axis configuration to ensure perfect alignment
+            const sharedXAxisConfig = {
+                type: 'linear',
+                min: minTime,
+                max: maxTime,
+                bounds: 'data',
+                grid: { 
+                    color: 'rgba(255, 255, 255, 0.1)',
+                    drawOnChartArea: true,
+                    lineWidth: 1
+                },
+                ticks: { 
+                    color: '#9aa0a6',
+                    stepSize: stepSize,
+                    maxRotation: 0,
+                    minRotation: 0,
+                    autoSkip: false,
+                    callback: function(value) {
+                        return Math.round(value);
+                    }
+                },
+                title: {
+                    display: true,
+                    text: 'Time (s)',
+                    color: '#00d9ff',
+                    font: { family: 'Orbitron', size: 12 }
+                },
+                offset: false
+            };
+            
+            // Shared layout configuration with explicit dimensions
+            const sharedLayout = {
+                padding: {
+                    left: 10,
+                    right: 10,
+                    top: 5,
+                    bottom: 5
+                }
+            };
+            
+            // Shared y-axis configuration to ensure same width
+            const sharedYAxisConfig = {
+                grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                ticks: { 
+                    color: '#9aa0a6',
+                    padding: 5,
+                    maxTicksLimit: 6
+                },
+                grace: 0,
+                afterFit: function(scaleInstance) {
+                    scaleInstance.width = 80; // Force all y-axes to be exactly 80 pixels wide
+                }
+            };
+            
+            // Create annotation for vertical line at peak heat flux time
+            const verticalLineAnnotation = showIndicators ? {
+                type: 'line',
+                scaleID: 'x',
+                value: peakHeatTime,
+                borderColor: '#ff6b35',
+                borderWidth: 2,
+                borderDash: [5, 5]
+            } : null;
+
+            // Create annotation for horizontal line at peak heat altitude (altitude chart only)
+            const horizontalLineAnnotation = showIndicators ? {
+                type: 'line',
+                scaleID: 'y',
+                value: peakHeatAltitude,
+                borderColor: '#00d9ff',
+                borderWidth: 2,
+                borderDash: [5, 5]
+            } : null;
+
+            // Altitude Chart
+            if (charts.altitude) charts.altitude.destroy();
+            
+            const altitudeAnnotations = {};
+            if (verticalLineAnnotation) altitudeAnnotations.verticalLine = verticalLineAnnotation;
+            if (horizontalLineAnnotation) altitudeAnnotations.horizontalLine = horizontalLineAnnotation;
+            
+            // Bank Angle Chart
+            if (charts.bankAngle) charts.bankAngle.destroy();
+            const bankAngleDataPoints = time.map((t, i) => ({ x: t, y: bankAngle[i] }));
+            charts.bankAngle = new Chart(document.getElementById('bankAngleChart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        data: bankAngleDataPoints,
+                        borderColor: '#b388ff',
+                        backgroundColor: 'rgba(179, 136, 255, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { ...sharedXAxisConfig },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#9aa0a6' },
+                            title: {
+                                display: true,
+                                text: 'Bank Angle (°)',
+                                color: '#b388ff',
+                                font: { family: 'Orbitron', size: 11, weight: 'bold' }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Convert to x-y data points
+            const altitudeData = time.map((t, i) => ({ x: t, y: altitude[i] }));
+
+            // Build altitude datasets
+            const altitudeDatasets = [{
+                label: 'Simulated',
+                data: altitudeData,
+                borderColor: '#ff6b35',
+                backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.4,
+                fill: true
+            }];
+
+            // Add real Apollo 10 data if in Apollo 10 mode
+            if (useApollo10InitialConditions) {
+                const realAltitudeData = APOLLO_10_REAL_ALTITUDE.map(p => ({ x: p.time, y: p.altitude }));
+                altitudeDatasets.push({
+                    label: 'Apollo 10 (Actual)',
+                    data: realAltitudeData,
+                    borderColor: '#ff0000',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: false
+                });
+            }
+
+            charts.altitude = new Chart(document.getElementById('altitudeChart'), {
+                type: 'line',
+                data: {
+                    datasets: altitudeDatasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    layout: { ...sharedLayout },
+                    plugins: {
+                        legend: {
+                            display: useApollo10InitialConditions,
+                            labels: {
+                                color: '#ffffff',
+                                font: { family: 'Orbitron', size: 10 }
+                            }
+                        },
+                        annotation: {
+                            annotations: altitudeAnnotations
+                        }
+                    },
+                    scales: {
+                        x: { ...sharedXAxisConfig },
+                        y: {
+                            ...sharedYAxisConfig,
+                            title: {
+                                display: true,
+                                text: 'Altitude (km)',
+                                color: '#ff6b35',
+                                font: { family: 'Orbitron', size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Velocity Chart
+            if (charts.velocity) charts.velocity.destroy();
+            
+            const velocityAnnotations = {};
+            if (verticalLineAnnotation) velocityAnnotations.verticalLine = verticalLineAnnotation;
+
+            // Convert to x-y data points
+            const velocityData = time.map((t, i) => ({ x: t, y: velocity[i] }));
+
+            // Build velocity datasets
+            const velocityDatasets = [{
+                label: 'Simulated',
+                data: velocityData,
+                borderColor: '#00d9ff',
+                backgroundColor: 'rgba(0, 217, 255, 0.1)',
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.4,
+                fill: true
+            }];
+
+            // Add real Apollo 10 data if in Apollo 10 mode
+            if (useApollo10InitialConditions) {
+                const realVelocityData = APOLLO_10_REAL_VELOCITY.map(p => ({ x: p.time, y: p.velocity }));
+                velocityDatasets.push({
+                    label: 'Apollo 10 (Actual)',
+                    data: realVelocityData,
+                    borderColor: '#ff0000',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: false
+                });
+            }
+
+            charts.velocity = new Chart(document.getElementById('velocityChart'), {
+                type: 'line',
+                data: {
+                    datasets: velocityDatasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    layout: { ...sharedLayout },
+                    plugins: {
+                        legend: {
+                            display: useApollo10InitialConditions,
+                            labels: {
+                                color: '#ffffff',
+                                font: { family: 'Orbitron', size: 10 }
+                            }
+                        },
+                        annotation: {
+                            annotations: velocityAnnotations
+                        }
+                    },
+                    scales: {
+                        x: { ...sharedXAxisConfig },
+                        y: {
+                            ...sharedYAxisConfig,
+                            title: {
+                                display: true,
+                                text: 'Velocity (km/s)',
+                                color: '#00d9ff',
+                                font: { family: 'Orbitron', size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Deceleration Chart
+            if (charts.decel) charts.decel.destroy();
+            
+            const decelAnnotations = {};
+            if (verticalLineAnnotation) decelAnnotations.verticalLine = verticalLineAnnotation;
+            
+            // Convert to x-y data points
+            const decelData = time.map((t, i) => ({ x: t, y: deceleration[i] }));
+            
+            charts.decel = new Chart(document.getElementById('decelChart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        data: decelData,
+                        borderColor: '#39ff14',
+                        backgroundColor: 'rgba(57, 255, 20, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    layout: { ...sharedLayout },
+                    plugins: {
+                        legend: { display: false },
+                        annotation: {
+                            annotations: decelAnnotations
+                        }
+                    },
+                    scales: {
+                        x: { ...sharedXAxisConfig },
+                        y: {
+                            ...sharedYAxisConfig,
+                            title: {
+                                display: true,
+                                text: 'Deceleration (g)',
+                                color: '#39ff14',
+                                font: { family: 'Orbitron', size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Heat Flux Chart
+            if (charts.heat) charts.heat.destroy();
+            
+            const heatAnnotations = {};
+            if (verticalLineAnnotation) heatAnnotations.verticalLine = verticalLineAnnotation;
+            
+            // Convert to x-y data points
+            const heatFluxDataPoints = time.map((t, i) => ({ x: t, y: heatFlux[i] / 1000 })); // Convert to kW/m²
+            
+            charts.heat = new Chart(document.getElementById('heatChart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        data: heatFluxDataPoints,
+                        borderColor: '#ff6b35',
+                        backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    layout: { ...sharedLayout },
+                    plugins: {
+                        legend: { display: false },
+                        annotation: {
+                            annotations: heatAnnotations
+                        }
+                    },
+                    scales: {
+                        x: { ...sharedXAxisConfig },
+                        y: {
+                            ...sharedYAxisConfig,
+                            ticks: {
+                                ...sharedYAxisConfig.ticks,
+                                callback: function(value) {
+                                    return value.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Heat Flux (kW/m²)',
+                                color: '#ff6b35',
+                                font: { family: 'Orbitron', size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Flight Path Angle Chart
+            if (charts.fpa) charts.fpa.destroy();
+            
+            const fpaAnnotations = {};
+            if (verticalLineAnnotation) fpaAnnotations.verticalLine = verticalLineAnnotation;
+            
+            const fpaDataPoints = time.map((t, i) => ({ x: t, y: fpa[i] }));
+            
+            charts.fpa = new Chart(document.getElementById('fpaChart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        data: fpaDataPoints,
+                        borderColor: '#00d9ff',
+                        backgroundColor: 'rgba(0, 217, 255, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    layout: { ...sharedLayout },
+                    plugins: {
+                        legend: { display: false },
+                        annotation: {
+                            annotations: fpaAnnotations
+                        }
+                    },
+                    scales: {
+                        x: { ...sharedXAxisConfig },
+                        y: {
+                            ...sharedYAxisConfig,
+                            title: {
+                                display: true,
+                                text: 'Flight Path Angle (°)',
+                                color: '#00d9ff',
+                                font: { family: 'Orbitron', size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Altitude vs Downrange Chart
+            if (charts.downrange) charts.downrange.destroy();
+            
+            const downrangeDataPoints = downrange.map((dr, i) => ({ x: dr, y: altitude[i] }));
+            
+            charts.downrange = new Chart(document.getElementById('downrangeChart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        data: downrangeDataPoints,
+                        borderColor: '#39ff14',
+                        backgroundColor: 'rgba(57, 255, 20, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    layout: { ...sharedLayout },
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#9aa0a6' },
+                            title: {
+                                display: true,
+                                text: 'Downrange (km)',
+                                color: '#00d9ff',
+                                font: { family: 'Orbitron', size: 12 }
+                            }
+                        },
+                        y: {
+                            ...sharedYAxisConfig,
+                            title: {
+                                display: true,
+                                text: 'Altitude (km)',
+                                color: '#ff6b35',
+                                font: { family: 'Orbitron', size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Altitude vs Crossrange Chart
+            if (charts.crossrange) charts.crossrange.destroy();
+            
+            const crossrangeDataPoints = crossrange.map((cr, i) => ({ x: cr, y: altitude[i] }));
+            
+            charts.crossrange = new Chart(document.getElementById('crossrangeChart'), {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        data: crossrangeDataPoints,
+                        borderColor: '#ff6b35',
+                        backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.4,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    layout: { ...sharedLayout },
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#9aa0a6' },
+                            title: {
+                                display: true,
+                                text: 'Crossrange (km)',
+                                color: '#00d9ff',
+                                font: { family: 'Orbitron', size: 12 }
+                            }
+                        },
+                        y: {
+                            ...sharedYAxisConfig,
+                            title: {
+                                display: true,
+                                text: 'Altitude (km)',
+                                color: '#ff6b35',
+                                font: { family: 'Orbitron', size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Run initial simulation on load
+        window.addEventListener('load', () => {
+            runSimulation();
+        });
+    </script>
+    
+    <script>
+        /* ===== BEGIN VIS BRIDGE (NON-PHYSICS) ===== */
+        (function() {
+            'use strict';
+            
+            // Telemetry buffer
+            let telemetryBuffer = [];
+            let vizWindow = null;
+            let vizReady = false;
+            
+            /* === FIX: VIS TRAJECTORY STREAMING === */
+            // Listen for vizReady handshake from visualization window
+            window.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'vizReady') {
+                    console.log('[VIS-BRIDGE] Received vizReady handshake from visualization');
+                    vizReady = true;
+                    
+                    // Immediately send current trajectory if available
+                    if (telemetryBuffer.length > 0) {
+                        console.log('[VIS-BRIDGE] Sending buffered trajectory data after vizReady');
+                        sendTelemetryToViz();
+                    } else {
+                        console.log('[VIS-BRIDGE] No trajectory data buffered yet, waiting for simulation');
+                    }
+                }
+            });
+            /* === END FIX === */
+            
+            // Connect to existing visualization launch button
+            function connectLaunchButton() {
+                const btn = document.getElementById('launch-viz-btn');
+                if (btn) {
+                    btn.onmouseover = () => {
+                        btn.style.transform = 'scale(1.05)';
+                        btn.style.boxShadow = '0 6px 30px rgba(0, 217, 255, 0.7)';
+                    };
+                    btn.onmouseout = () => {
+                        btn.style.transform = 'scale(1)';
+                        btn.style.boxShadow = '0 4px 20px rgba(255, 107, 53, 0.5)';
+                    };
+                    btn.onclick = () => {
+                        /* === FIX: VIS TRAJECTORY STREAMING === */
+                        vizReady = false; // Reset ready flag when opening new window
+                        vizWindow = window.open('reentry_trajectory_viz_integrated.html', '_blank');
+                        console.log('[VIS-BRIDGE] Opened visualization window, waiting for vizReady handshake');
+                        /* === END FIX === */
+                    };
+                }
+            }
+            
+            // Convert latitude/longitude to Cartesian coordinates
+            function latLonToCartesian(lat, lon, altitude) {
+                const R_EARTH = 6378.137; // km
+                const radius = R_EARTH + altitude;
+                const phi = (90 - lat) * Math.PI / 180;
+                const theta = lon * Math.PI / 180;  // Remove +180 shift
+                
+                return {
+                    x: radius * Math.sin(phi) * Math.cos(theta),  // Remove negative sign
+                    y: radius * Math.cos(phi),
+                    z: radius * Math.sin(phi) * Math.sin(theta)
+                };
+            }
+            
+            // Build telemetry from simulation arrays (READ ONLY)
+            function buildTelemetry() {
+                /* === FIX: VIS TRAJECTORY STREAMING === */
+                console.log('[VIS-BRIDGE] buildTelemetry() called');
+                console.log('[VIS-BRIDGE] window.charts exists:', !!window.charts);
+                /* === END FIX === */
+                
+                // Access global simulation arrays (READ ONLY)
+                const timeData = window.charts?.timeData || [];
+                const altitudeData = window.charts?.altitudeData || [];
+                const velocityData = window.charts?.velocityData || [];
+                const decelData = window.charts?.decelData || [];
+                const heatFluxData = window.charts?.heatFluxData || [];
+                const fpaData = window.charts?.fpaData || [];
+                const downrangeData = window.charts?.downrangeData || [];
+                const crossrangeData = window.charts?.crossrangeData || [];
+                const bankAngleData = window.charts?.bankAngleData || [];
+                const latitudeData = window.charts?.latitudeData || [];
+                const longitudeData = window.charts?.longitudeData || [];
+                
+                /* === FIX: VIS TRAJECTORY STREAMING === */
+                console.log('[VIS-BRIDGE] Data array lengths:', {
+                    time: timeData.length,
+                    altitude: altitudeData.length,
+                    velocity: velocityData.length,
+                    latitude: latitudeData.length,
+                    longitude: longitudeData.length
+                });
+                /* === END FIX === */
+                
+                if (timeData.length === 0) {
+                    console.warn('[VIS-BRIDGE] No simulation data available yet');
+                    return;
+                }
+                
+                // Clear and rebuild buffer
+                telemetryBuffer = [];
+                
+                for (let i = 0; i < timeData.length; i++) {
+                    const alt = altitudeData[i];
+                    const vel = velocityData[i];
+                    const time = timeData[i];
+                    const gLoad = decelData[i];
+                    const heat = heatFluxData[i];
+                    const fpa = fpaData[i];
+                    const downrange = downrangeData[i];
+                    const crossrange = crossrangeData[i];
+                    const bankAngle = bankAngleData[i];
+                    
+                    // Use actual latitude and longitude from simulation
+                    const lat = latitudeData[i];
+                    const lon = longitudeData[i];
+                    
+                    // Convert to Cartesian for visualization
+                    const pos = latLonToCartesian(lat, lon, alt);
+                    
+                    telemetryBuffer.push({
+                        x: pos.x,
+                        y: pos.y,
+                        z: pos.z,
+                        lat: lat,
+                        lon: lon,
+                        altitude: alt,
+                        velocity: vel,
+                        time: time,
+                        gLoad: gLoad,
+                        heatFlux: heat,
+                        fpa: fpa,
+                        bankAngle: bankAngle
+                    });
+                }
+                
+                /* === FIX: VIS TRAJECTORY STREAMING === */
+                console.log(`[VIS-BRIDGE] Telemetry buffer built: ${telemetryBuffer.length} points`);
+                if (telemetryBuffer.length > 0) {
+                    console.log('[VIS-BRIDGE] First point:', telemetryBuffer[0]);
+                    console.log('[VIS-BRIDGE] Last point:', telemetryBuffer[telemetryBuffer.length - 1]);
+                }
+                /* === END FIX === */
+            }
+            
+            // Send telemetry to visualization window
+            function sendTelemetryToViz() {
+                /* === FIX: VIS TRAJECTORY STREAMING === */
+                console.log('[VIS-BRIDGE] sendTelemetryToViz() called');
+                console.log('[VIS-BRIDGE] vizWindow exists:', !!vizWindow);
+                console.log('[VIS-BRIDGE] vizWindow closed:', vizWindow ? vizWindow.closed : 'N/A');
+                console.log('[VIS-BRIDGE] vizReady:', vizReady);
+                console.log('[VIS-BRIDGE] telemetryBuffer length:', telemetryBuffer.length);
+                /* === END FIX === */
+                
+                if (!vizWindow || vizWindow.closed) {
+                    console.warn('[VIS-BRIDGE] Visualization window not open');
+                    return;
+                }
+                
+                /* === FIX: VIS TRAJECTORY STREAMING === */
+                if (!vizReady) {
+                    console.warn('[VIS-BRIDGE] Visualization not ready yet, waiting for vizReady handshake');
+                    return;
+                }
+                /* === END FIX === */
+                
+                if (telemetryBuffer.length === 0) {
+                    console.warn('[VIS-BRIDGE] No telemetry data to send');
+                    return;
+                }
+                
+                try {
+                    // Get current L/D ratio from UI
+                    // Use ?? instead of || so that L/D = 0 is properly sent (0 is falsy but valid)
+                    const ldElement = document.getElementById('ld');
+                    const currentLD = ldElement ? parseFloat(ldElement.value) : 0.32;
+
+                    vizWindow.postMessage({
+                        type: 'TRAJECTORY_DATA',
+                        payload: telemetryBuffer,
+                        orbitalPlane: window.charts?.orbitalPlaneNormal,
+                        initialPosition: window.charts?.initialPosition,
+                        liftToDrag: currentLD,  // Added for Vehicle Viewer
+                        isApollo10: useApollo10InitialConditions  // For historical sun position
+                    }, '*');
+                    console.log(`[VIS-BRIDGE] ✓ SENT ${telemetryBuffer.length} telemetry points to visualization`);
+                    console.log(`[VIS-BRIDGE] ✓ SENT L/D ratio: ${currentLD}`);
+                    console.log(`[VIS-BRIDGE] ✓ SENT isApollo10: ${useApollo10InitialConditions}`);
+                    if (window.charts?.orbitalPlaneNormal) {
+                        console.log('[VIS-BRIDGE] ✓ SENT orbital plane data');
+                    }
+                } catch (err) {
+                    console.error('[VIS-BRIDGE] Failed to send telemetry:', err);
+                }
+            }
+            
+            // Monkey-patch runSimulation to capture telemetry after completion
+            const originalRunSimulation = window.runSimulation;
+            window.runSimulation = function(...args) {
+                /* === FIX: VIS TRAJECTORY STREAMING === */
+                console.log('[VIS-BRIDGE] runSimulation() intercepted, calling original...');
+                /* === END FIX === */
+                
+                // Call original simulation (UNMODIFIED)
+                const result = originalRunSimulation.apply(this, args);
+                
+                /* === FIX: VIS TRAJECTORY STREAMING === */
+                // AFTER simulation completes, build and send telemetry (READ ONLY)
+                setTimeout(() => {
+                    console.log('[VIS-BRIDGE] Post-simulation: building telemetry...');
+                    buildTelemetry();
+                    if (vizWindow && !vizWindow.closed && vizReady) {
+                        console.log('[VIS-BRIDGE] Post-simulation: sending to viz...');
+                        sendTelemetryToViz();
+                    } else {
+                        console.log('[VIS-BRIDGE] Post-simulation: viz not ready or not open, data buffered for later');
+                    }
+                }, 100);
+                /* === END FIX === */
+                
+                return result;
+            };
+            
+            // Build initial telemetry after page load so it's ready when user opens viz
+            window.addEventListener('load', () => {
+                setTimeout(() => {
+                    console.log('[VIS-BRIDGE] Page loaded, building initial telemetry from existing simulation');
+                    buildTelemetry();
+                }, 500); // Wait for initial simulation to complete
+            });
+            
+            // Connect button on load
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', connectLaunchButton);
+            } else {
+                connectLaunchButton();
+            }
+            
+            console.log('[VIS-BRIDGE] Integration initialized');
+        })();
+        /* ===== END VIS BRIDGE ===== */
+    </script>
+</body>
+</html>

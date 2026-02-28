@@ -1,0 +1,3721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reentry Vehicle Viewer</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #000;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            min-width: 280px;
+        }
+
+        h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            border-bottom: 2px solid #ff6600;
+            padding-bottom: 10px;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .section-title {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .vehicle-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 8px;
+            border: 2px solid #444;
+            border-radius: 6px;
+            background: #2a2a2a;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .vehicle-btn:hover {
+            border-color: #ff6600;
+            background: #333;
+        }
+
+        .vehicle-btn.active {
+            border-color: #ff6600;
+            background: rgba(255, 102, 0, 0.2);
+        }
+
+        .vehicle-btn .key {
+            display: inline-block;
+            background: #444;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-right: 10px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .slider-group {
+            margin-bottom: 15px;
+        }
+
+        .slider-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+
+        .slider-group input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .slider-value {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .slider-value .current {
+            color: #ff6600;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .heat-indicator {
+            margin-top: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px 40px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        #stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        #stats .label {
+            color: #888;
+        }
+
+        #stats .value {
+            color: #ff6600;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div id="controls">
+        <h2>Reentry Vehicle Viewer</h2>
+
+        <div class="section">
+            <div class="section-title">Select Vehicle</div>
+            <button class="vehicle-btn" data-vehicle="1">
+                <span class="key">1</span> Apollo CM
+            </button>
+            <button class="vehicle-btn" data-vehicle="2">
+                <span class="key">2</span> Dream Chaser
+            </button>
+            <button class="vehicle-btn" data-vehicle="3">
+                <span class="key">3</span> X-37B
+            </button>
+            <button class="vehicle-btn" data-vehicle="4">
+                <span class="key">4</span> Stardust SRC
+            </button>
+            <button class="vehicle-btn" data-vehicle="5">
+                <span class="key">5</span> Mercury
+            </button>
+            <button class="vehicle-btn" data-vehicle="6">
+                <span class="key">6</span> School Bus
+            </button>
+            <button class="vehicle-btn" data-vehicle="7">
+                <span class="key">7</span> Shuttle Orbiter
+            </button>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Heat Flux Control</div>
+            <div class="slider-group">
+                <label>Heat Flux Level</label>
+                <input type="range" id="heatFluxSlider" min="0" max="4000" value="0" step="50">
+                <div class="slider-value">
+                    <span>0</span>
+                    <span class="current"><span id="heatFluxValue">0</span> kW/m²</span>
+                    <span>4000</span>
+                </div>
+            </div>
+            <div class="heat-indicator" id="heatIndicator" style="background: #1a1a1a; border: 1px solid #333;">
+                Cold - No heating
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Trail Settings</div>
+            <div class="slider-group">
+                <label>Trail Length</label>
+                <input type="range" id="trailLengthSlider" min="0.5" max="3" value="1.5" step="0.1">
+                <div class="slider-value">
+                    <span>Short</span>
+                    <span class="current"><span id="trailLengthValue">1.5</span>x</span>
+                    <span>Long</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="stats">
+        <div><span class="label">Particles:</span> <span class="value" id="particleCount">0</span></div>
+        <div><span class="label">Heat Shield:</span> <span class="value" id="heatShieldStatus">-</span></div>
+    </div>
+
+    <div id="info">
+        Click + Drag to rotate | Scroll to zoom | Right-click to pan<br>
+        Press 1-7 to switch vehicles | Press D to toggle bow shock debug
+    </div>
+
+    <div id="loading">Loading...</div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+
+        // Camera
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5, 3, 8);
+
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.5;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 5);
+        scene.add(directionalLight);
+
+        const backLight = new THREE.DirectionalLight(0x4488ff, 0.3);
+        backLight.position.set(-5, 5, -5);
+        scene.add(backLight);
+
+        // Heat glow light (dynamic)
+        const heatLight = new THREE.PointLight(0xff4400, 0, 20);
+        heatLight.position.set(0, -2, 0);
+        scene.add(heatLight);
+
+        // Vehicle definitions with specific heat shield mesh names
+        const vehicles = {
+            1: { name: 'Apollo CM', filename: 'Apollo_CM_heatshield.glb', heatShieldMeshes: ['Cube', 'heat-shield'] },
+            2: { name: 'Dream Chaser', filename: 'DreamChaser_heatshield.glb', heatShieldMeshes: ['heatshield', 'heat-shield', 'thermal'] },
+            3: { name: 'X-37B', filename: 'x-37b.glb', heatShieldMeshes: ['heatshield', 'heat-shield', 'thermal', 'bottom'] },
+            4: { name: 'Stardust SRC', filename: 'stardust_capsule.glb', heatShieldMeshes: ['HeatShield', 'heat-shield', 'heatshield'] },
+            5: { name: 'Mercury', filename: 'mercury_capsule.glb', heatShieldMeshes: ['HeatShield', 'heat-shield', 'heatshield'] },
+            6: { name: 'School Bus', filename: 'school_bus.glb', heatShieldMeshes: [], isTumbling: true, dynamicHeatShield: true },
+            7: { name: 'Shuttle Orbiter', filename: 'shuttle_orbiter.glb', heatShieldMeshes: ['HeatShield', 'heat-shield', 'heatshield', 'BellyTiles'] }
+        };
+
+        // State
+        let currentVehicle = null;
+        let currentVehicleConfig = null;
+        let heatShieldMeshes = [];
+        let heatShieldVertices = [];
+        let cachedWorldVerts = [];  // Store world verts for conformal shock generation
+        let originalMaterials = new Map();
+        let heatFlux = 0;
+        let trailLengthMultiplier = 1.5;
+
+        // Heat color constants
+        const COLOR_COLD = new THREE.Color(0x1a1a1a);
+        const COLOR_DARK_RED = new THREE.Color(0x4a0000);
+        const COLOR_RED = new THREE.Color(0xff1100);
+        const COLOR_ORANGE = new THREE.Color(0xff5500);
+        const COLOR_YELLOW = new THREE.Color(0xffdd00);
+        const COLOR_WHITE = new THREE.Color(0xffffff);
+
+        // Neutral atmospheric grey for smoke transition
+        const SMOKE_GREY = new THREE.Color(160/255, 160/255, 165/255);
+
+        // Plasma color transition stages (ionization colors)
+        const PLASMA_PINK = new THREE.Color(1.0, 0.4, 0.6);
+        const PLASMA_VIOLET = new THREE.Color(0.6, 0.3, 0.8);
+        const PLASMA_BLUE = new THREE.Color(0.4, 0.5, 0.9);
+
+        // Soot layer colors (for upgraded smoke trail)
+        const SOOT_BURNT_ORANGE = new THREE.Color(0.6, 0.3, 0.1);
+        const SOOT_BROWN = new THREE.Color(0.3, 0.2, 0.15);
+        const SOOT_DARK_GREY = new THREE.Color(0.15, 0.15, 0.15);
+
+        const PEAK_HEAT_FLUX = 4000;
+        const SPAWN_HEAT_THRESHOLD = 200;
+
+        // Cached heat shield color for particle spawning (sampled from material)
+        let cachedHeatShieldColor = new THREE.Color(0x1a1a1a);
+
+        // ================================================================
+        // TUMBLING REENTRY SYSTEM (for uncontrolled vehicles like School Bus)
+        // ================================================================
+        // State machine: STABLE -> TUMBLING -> STABLE
+        // Varies timing and tumble speed for realistic chaotic motion
+
+        // Continuous tumble system - always moving with periodic pauses to oscillate
+        let tumbleCurrentQuat = new THREE.Quaternion();
+        let tumbleTargetQuat = new THREE.Quaternion();
+        let tumbleAngularVelocity = 0;  // Current rotation speed (radians/sec)
+        let tumbleTargetVelocity = 0;   // Target rotation speed
+        let tumbleAxis = new THREE.Vector3(1, 0, 0);
+
+        // Timing for motion phases
+        let phaseTimer = 0;
+        let phaseDuration = 0;
+        let isResting = false;  // true = oscillating in place, false = reorienting
+
+        // Oscillation parameters (always active, amplitude varies)
+        let oscillationTime = 0;
+        let oscillationFreqX = 0;
+        let oscillationFreqY = 0;
+        let oscillationFreqZ = 0;
+        let oscillationAmpX = 0;
+        let oscillationAmpY = 0;
+        let oscillationAmpZ = 0;
+        let oscillationPhaseX = 0;
+        let oscillationPhaseY = 0;
+        let oscillationPhaseZ = 0;
+        let oscillationAmplitudeScale = 1.0;  // Blended amplitude
+        let targetOscAmplitude = 1.0;
+
+        // Wind axes for uncontrolled reentry (world-fixed)
+        let windAxes = null;
+
+        // All meshes for dynamic heating (school bus)
+        let allVehicleMeshes = [];
+        let dynamicHeatMaterials = new Map();  // Store shader materials for dynamic heating
+
+        // Cached windward vertices for particle spawning
+        let cachedWindwardVertices = [];
+
+        // ================================================================
+        // CONTINUOUS SURFACE BOW SHOCK GENERATION SYSTEM
+        // ================================================================
+        // Generates smooth, continuous triangulated surface mesh
+        // driven by heat shield mesh vertices
+        // NO particles, points, or billboards - proper surface only
+
+        // Debug flag - toggle with 'D' key
+        let DEBUG_BOW_SHOCK = true;
+
+        // Debug visualization objects
+        let debugGroup = null;
+        let debugCenterMarker = null;
+        let debugNormalArrow = null;
+
+        // Shield geometry data
+        let shieldCenter = new THREE.Vector3();
+        let shieldNormal = new THREE.Vector3(-1, 0, 0);  // Points upstream
+        let maxShieldRadius = 2.0;
+
+        // Smoothed values for jitter-free rendering
+        let smoothedShieldCenter = new THREE.Vector3();
+        let smoothedShieldNormal = new THREE.Vector3(-1, 0, 0);  // Points upstream
+        let smoothedRadius = 2.0;
+
+        // Parametric surface resolution
+        const THETA_SEGMENTS = 48;  // Angular resolution around axis
+        const PHI_SEGMENTS = 24;    // Resolution from apex to rim
+
+        // Vehicle-specific shock parameters (per directive)
+        const SHOCK_PARAMS = {
+            apollo: {
+                standoffDistance: 0.25,   // * R_max - detached shock
+                spillFactor: 0.15,        // * R_max - downstream spill
+                curvature: 0.8,           // High curvature (rounded bulb)
+                trailingLength: 0.5       // * standoff
+            },
+            dreamchaser: {
+                standoffDistance: 0.04,   // * R_max - tight attached
+                spillFactor: 0.35,        // * R_max - wraps edges
+                curvature: 0.3,           // Low curvature (hugs surface)
+                trailingLength: 0.8
+            },
+            x37b: {
+                standoffDistance: 0.04,
+                spillFactor: 0.35,
+                curvature: 0.3,
+                trailingLength: 0.8
+            },
+            stardust: {
+                standoffDistance: 0.25,   // Same as Apollo - detached shock
+                spillFactor: 0.15,        // Same as Apollo
+                curvature: 0.8,           // High curvature (rounded bulb)
+                trailingLength: 0.5       // Same as Apollo
+            },
+            mercury: {
+                standoffDistance: 0.25,   // Blunt body - detached shock like Apollo
+                spillFactor: 0.15,        // Similar to Apollo
+                curvature: 0.8,           // High curvature (rounded bulb)
+                trailingLength: 0.5       // Similar to Apollo
+            },
+            schoolbus: {
+                standoffDistance: 0.08,   // Tighter shock - more like lifting body
+                spillFactor: 0.25,        // Wraps around edges
+                curvature: 0.4,           // Medium curvature
+                trailingLength: 0.6       // Medium trail
+            },
+            shuttle: {
+                standoffDistance: 0.05,   // Tight conformal shock like lifting bodies
+                spillFactor: 0.30,        // Wraps around wing edges
+                curvature: 0.35,          // Low curvature - hugs surface
+                trailingLength: 0.7       // Medium-long trail
+            }
+        };
+
+        /**
+         * Get vehicle type from config
+         */
+        function getVehicleType() {
+            if (!currentVehicleConfig) return 'apollo';
+            const name = currentVehicleConfig.name.toLowerCase();
+            if (name.includes('dream')) return 'dreamchaser';
+            if (name.includes('x-37') || name.includes('x37')) return 'x37b';
+            if (name.includes('stardust')) return 'stardust';
+            if (name.includes('mercury')) return 'mercury';
+            if (name.includes('bus') || name.includes('school')) return 'schoolbus';
+            if (name.includes('shuttle') || name.includes('orbiter')) return 'shuttle';
+            return 'apollo';
+        }
+
+        /**
+         * Initialize debug visualization
+         */
+        function initDebugVisualization() {
+            debugGroup = new THREE.Group();
+            debugGroup.name = 'bowShockDebug';
+            scene.add(debugGroup);
+
+            // Center marker
+            const markerGeo = new THREE.SphereGeometry(0.15, 12, 12);
+            const markerMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+            debugCenterMarker = new THREE.Mesh(markerGeo, markerMat);
+            debugGroup.add(debugCenterMarker);
+
+            // Normal arrow
+            debugNormalArrow = new THREE.ArrowHelper(
+                new THREE.Vector3(1, 0, 0),
+                new THREE.Vector3(),
+                2.0,
+                0x00ff00,
+                0.4,
+                0.2
+            );
+            debugGroup.add(debugNormalArrow);
+
+            debugGroup.visible = DEBUG_BOW_SHOCK;
+        }
+
+        /**
+         * STEP 1: Extract heat shield vertices in world space
+         */
+        function extractHeatShieldVerticesWorld(mesh) {
+            const geometry = mesh.geometry;
+            const positions = geometry.attributes.position;
+            const vertexCount = positions.count;
+
+            mesh.updateWorldMatrix(true, false);
+            const worldMatrix = mesh.matrixWorld;
+
+            const worldVerts = [];
+            for (let i = 0; i < vertexCount; i++) {
+                const v = new THREE.Vector3(
+                    positions.getX(i),
+                    positions.getY(i),
+                    positions.getZ(i)
+                );
+                v.applyMatrix4(worldMatrix);
+                worldVerts.push(v);
+            }
+
+            return worldVerts;
+        }
+
+        /**
+         * STEP 2: Compute shield plane via PCA/best-fit
+         * Returns centroid C and outward-facing normal N_plane
+         */
+        function computeShieldPlane(worldVerts, velocityVector) {
+            // Compute centroid
+            shieldCenter.set(0, 0, 0);
+            for (const v of worldVerts) {
+                shieldCenter.add(v);
+            }
+            shieldCenter.divideScalar(worldVerts.length);
+
+            // Build covariance matrix for PCA
+            let xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
+            for (const v of worldVerts) {
+                const dx = v.x - shieldCenter.x;
+                const dy = v.y - shieldCenter.y;
+                const dz = v.z - shieldCenter.z;
+                xx += dx * dx;
+                xy += dx * dy;
+                xz += dx * dz;
+                yy += dy * dy;
+                yz += dy * dz;
+                zz += dz * dz;
+            }
+
+            // Find normal as eigenvector with smallest eigenvalue
+            // Using determinant-based approach
+            const det_x = yy * zz - yz * yz;
+            const det_y = xx * zz - xz * xz;
+            const det_z = xx * yy - xy * xy;
+
+            const dir1 = new THREE.Vector3(det_x, xy * zz - yz * xz, xy * yz - yy * xz);
+            const dir2 = new THREE.Vector3(xz * yz - xy * zz, det_y, xy * xz - xx * yz);
+            const dir3 = new THREE.Vector3(xy * yz - xz * yy, xy * xz - xx * yz, det_z);
+
+            const mag1 = dir1.lengthSq();
+            const mag2 = dir2.lengthSq();
+            const mag3 = dir3.lengthSq();
+
+            if (mag1 >= mag2 && mag1 >= mag3) {
+                shieldNormal.copy(dir1);
+            } else if (mag2 >= mag1 && mag2 >= mag3) {
+                shieldNormal.copy(dir2);
+            } else {
+                shieldNormal.copy(dir3);
+            }
+
+            if (shieldNormal.lengthSq() > 0.0001) {
+                shieldNormal.normalize();
+            } else {
+                shieldNormal.set(1, 0, 0);
+            }
+
+            // Ensure normal faces upstream (dot with velocity > 0 means facing downstream)
+            if (shieldNormal.dot(velocityVector) > 0) {
+                shieldNormal.negate();
+            }
+
+            // Belt and suspenders: since velocity is always +X, normal must have negative X
+            // This catches any PCA edge cases where the above check doesn't work
+            if (shieldNormal.x > 0) {
+                shieldNormal.negate();
+            }
+        }
+
+        /**
+         * STEP 3: Project vertices onto shield plane and find radial profile
+         */
+        function computeShieldRadialProfile(worldVerts) {
+            maxShieldRadius = 0;
+
+            // Compute tangent basis for projection
+            const up = Math.abs(shieldNormal.y) < 0.9
+                ? new THREE.Vector3(0, 1, 0)
+                : new THREE.Vector3(1, 0, 0);
+            const localTangentU = new THREE.Vector3().crossVectors(shieldNormal, up).normalize();
+            const localTangentV = new THREE.Vector3().crossVectors(shieldNormal, localTangentU).normalize();
+
+            for (const v of worldVerts) {
+                // Project onto plane
+                const toVertex = new THREE.Vector3().subVectors(v, shieldCenter);
+                const u = toVertex.dot(localTangentU);
+                const w = toVertex.dot(localTangentV);
+                const r = Math.sqrt(u * u + w * w);
+
+                if (r > maxShieldRadius) {
+                    maxShieldRadius = r;
+                }
+            }
+
+            return maxShieldRadius;
+        }
+
+        /**
+         * Generate conformal shock geometry for Dream Chaser and X-37B
+         * Creates a shock surface that follows the exact shape of the heat shield mesh
+         */
+        function generateConformalShockGeometry(vehicleType, params) {
+            const mesh = heatShieldMeshes[0];
+            if (!mesh || !mesh.geometry) return null;
+
+            const geometry = mesh.geometry;
+            const posAttr = geometry.attributes.position;
+            const normalAttr = geometry.attributes.normal;
+            const indexAttr = geometry.index;
+
+            if (!posAttr) return null;
+
+            // Get the mesh's world matrix
+            mesh.updateMatrixWorld(true);
+            const worldMatrix = mesh.matrixWorld;
+            const normalMatrix = new THREE.Matrix3().getNormalMatrix(worldMatrix);
+
+            // Standoff distance - offset in velocity direction (+X)
+            const standoffDistance = 0.05;  // Very tight standoff
+
+            // First pass: compute center of heat shield in world space for edge detection
+            let centerX = 0, centerY = 0, centerZ = 0;
+            for (let i = 0; i < posAttr.count; i++) {
+                const localPos = new THREE.Vector3(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+                const worldPos = localPos.applyMatrix4(worldMatrix.clone());
+                centerX += worldPos.x;
+                centerY += worldPos.y;
+                centerZ += worldPos.z;
+            }
+            centerX /= posAttr.count;
+            centerY /= posAttr.count;
+            centerZ /= posAttr.count;
+
+            // Find max distance from center and X range for normalization
+            let maxDist = 0;
+            let minX = Infinity, maxX = -Infinity;
+            for (let i = 0; i < posAttr.count; i++) {
+                const localPos = new THREE.Vector3(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+                const worldPos = localPos.applyMatrix4(worldMatrix.clone());
+                const dy = worldPos.y - centerY;
+                const dz = worldPos.z - centerZ;
+                const dist = Math.sqrt(dy * dy + dz * dz);
+                if (dist > maxDist) maxDist = dist;
+                if (worldPos.x < minX) minX = worldPos.x;
+                if (worldPos.x > maxX) maxX = worldPos.x;
+            }
+            const xRange = maxX - minX;
+
+            const vertices = [];
+            const normals = [];
+            const uvs = [];
+
+            // Spill parameters
+            const spillStrength = 0.15;  // How much extra offset at edges
+
+            // Transform each vertex to world space and offset
+            for (let i = 0; i < posAttr.count; i++) {
+                // Get local position
+                const localPos = new THREE.Vector3(
+                    posAttr.getX(i),
+                    posAttr.getY(i),
+                    posAttr.getZ(i)
+                );
+
+                // Transform to world space
+                const worldPos = localPos.applyMatrix4(worldMatrix);
+
+                // Calculate edge factor (0 at center, 1 at edge)
+                const dy = worldPos.y - centerY;
+                const dz = worldPos.z - centerZ;
+                const distFromCenter = Math.sqrt(dy * dy + dz * dz);
+                const edgeFactor = maxDist > 0 ? distFromCenter / maxDist : 0;
+
+                // Calculate nose factor (1 at front/nose, 0 at back)
+                // Reduce offset at the nose tip to keep it closer to heat shield
+                const noseFactor = xRange > 0 ? (worldPos.x - minX) / xRange : 0;
+                const noseReduction = Math.pow(noseFactor, 1.5) * 0.7;  // Reduce up to 70% at nose
+
+                // Curved spill: edges get pushed more downstream, but less at nose
+                const spillOffset = spillStrength * Math.pow(edgeFactor, 2) * (1 - noseReduction);
+
+                // Offset in velocity direction (+X) with spill and pitch correction
+                // Reduce standoff at nose tip
+                const adjustedStandoff = standoffDistance * (1 - noseReduction * 0.5);
+                worldPos.x += adjustedStandoff + spillOffset;
+                worldPos.y -= adjustedStandoff * 0.15;
+
+                vertices.push(worldPos.x, worldPos.y, worldPos.z);
+
+                // Transform normal to world space
+                if (normalAttr) {
+                    const localNormal = new THREE.Vector3(
+                        normalAttr.getX(i),
+                        normalAttr.getY(i),
+                        normalAttr.getZ(i)
+                    );
+                    const worldNormal = localNormal.applyMatrix3(normalMatrix).normalize();
+                    normals.push(worldNormal.x, worldNormal.y, worldNormal.z);
+                } else {
+                    normals.push(1, 0, 0);  // Default normal
+                }
+
+                // UVs for shader
+                const uvAttr = geometry.attributes.uv;
+                if (uvAttr) {
+                    uvs.push(uvAttr.getX(i), uvAttr.getY(i));
+                } else {
+                    uvs.push(i / posAttr.count, 0.5);
+                }
+            }
+
+            // Copy indices
+            const indices = [];
+            if (indexAttr) {
+                for (let i = 0; i < indexAttr.count; i++) {
+                    indices.push(indexAttr.getX(i));
+                }
+            } else {
+                // Non-indexed geometry - create sequential indices
+                for (let i = 0; i < posAttr.count; i++) {
+                    indices.push(i);
+                }
+            }
+
+            // Return typed arrays like the parametric version
+            return {
+                vertices: new Float32Array(vertices),
+                normals: new Float32Array(normals),
+                uvs: new Float32Array(uvs),
+                indices: indices.length > 65535
+                    ? new Uint32Array(indices)
+                    : new Uint16Array(indices)
+            };
+        }
+
+        /**
+         * Generate shock geometry from windward-facing vertices (for tumbling objects)
+         * Dynamically finds all surfaces facing the velocity vector and creates
+         * a conformal shock envelope around them
+         */
+        /**
+         * Generate conformal shock geometry for tumbling objects (School Bus)
+         * Clones windward-facing triangles and offsets them by 0.05
+         * Similar to Dream Chaser/X-37B approach but with dynamic face selection
+         */
+        function generateWindwardShockGeometry(params) {
+            if (allVehicleMeshes.length === 0) return null;
+
+            const velocityDir = new THREE.Vector3(1, 0, 0);
+            const standoffDistance = 0.05;  // Fixed offset of 0.05
+            const spillStrength = 0.08;
+
+            const vertices = [];
+            const normals = [];
+            const uvs = [];
+            const indices = [];
+
+            const tempPos = new THREE.Vector3();
+            const tempNormal = new THREE.Vector3();
+            const faceNormal = new THREE.Vector3();
+            const v0 = new THREE.Vector3();
+            const v1 = new THREE.Vector3();
+            const v2 = new THREE.Vector3();
+            const n0 = new THREE.Vector3();
+            const n1 = new THREE.Vector3();
+            const n2 = new THREE.Vector3();
+            const edge1 = new THREE.Vector3();
+            const edge2 = new THREE.Vector3();
+
+            let vertexIndex = 0;
+            let centerX = 0, centerY = 0, centerZ = 0;
+            let vertCount = 0;
+
+            // Process each mesh
+            allVehicleMeshes.forEach(mesh => {
+                if (!mesh.geometry) return;
+
+                const posAttr = mesh.geometry.attributes.position;
+                const normAttr = mesh.geometry.attributes.normal;
+                const indexAttr = mesh.geometry.index;
+                if (!posAttr) return;
+
+                mesh.updateMatrixWorld(true);
+                const worldMatrix = mesh.matrixWorld;
+                const normalMatrix = new THREE.Matrix3().getNormalMatrix(worldMatrix);
+
+                // Process triangles
+                const triCount = indexAttr ? indexAttr.count / 3 : posAttr.count / 3;
+
+                for (let tri = 0; tri < triCount; tri++) {
+                    // Get vertex indices for this triangle
+                    let i0, i1, i2;
+                    if (indexAttr) {
+                        i0 = indexAttr.getX(tri * 3);
+                        i1 = indexAttr.getX(tri * 3 + 1);
+                        i2 = indexAttr.getX(tri * 3 + 2);
+                    } else {
+                        i0 = tri * 3;
+                        i1 = tri * 3 + 1;
+                        i2 = tri * 3 + 2;
+                    }
+
+                    // Get vertex positions in world space
+                    v0.set(posAttr.getX(i0), posAttr.getY(i0), posAttr.getZ(i0)).applyMatrix4(worldMatrix);
+                    v1.set(posAttr.getX(i1), posAttr.getY(i1), posAttr.getZ(i1)).applyMatrix4(worldMatrix);
+                    v2.set(posAttr.getX(i2), posAttr.getY(i2), posAttr.getZ(i2)).applyMatrix4(worldMatrix);
+
+                    // Compute face normal
+                    edge1.subVectors(v1, v0);
+                    edge2.subVectors(v2, v0);
+                    faceNormal.crossVectors(edge1, edge2).normalize();
+
+                    // Check if face is windward (facing velocity)
+                    const windwardDot = faceNormal.dot(velocityDir);
+                    if (windwardDot < 0.05) continue;  // Skip non-windward faces
+
+                    // Get vertex normals
+                    if (normAttr) {
+                        n0.set(normAttr.getX(i0), normAttr.getY(i0), normAttr.getZ(i0)).applyMatrix3(normalMatrix).normalize();
+                        n1.set(normAttr.getX(i1), normAttr.getY(i1), normAttr.getZ(i1)).applyMatrix3(normalMatrix).normalize();
+                        n2.set(normAttr.getX(i2), normAttr.getY(i2), normAttr.getZ(i2)).applyMatrix3(normalMatrix).normalize();
+                    } else {
+                        n0.copy(faceNormal);
+                        n1.copy(faceNormal);
+                        n2.copy(faceNormal);
+                    }
+
+                    // Offset vertices in velocity direction (+X)
+                    const offset0 = standoffDistance + spillStrength * (1 - n0.dot(velocityDir));
+                    const offset1 = standoffDistance + spillStrength * (1 - n1.dot(velocityDir));
+                    const offset2 = standoffDistance + spillStrength * (1 - n2.dot(velocityDir));
+
+                    // Add offset vertices
+                    vertices.push(v0.x + offset0, v0.y, v0.z);
+                    vertices.push(v1.x + offset1, v1.y, v1.z);
+                    vertices.push(v2.x + offset2, v2.y, v2.z);
+
+                    // Add normals
+                    normals.push(n0.x, n0.y, n0.z);
+                    normals.push(n1.x, n1.y, n1.z);
+                    normals.push(n2.x, n2.y, n2.z);
+
+                    // Add UVs based on windward factor
+                    uvs.push(windwardDot, 0.5);
+                    uvs.push(windwardDot, 0.5);
+                    uvs.push(windwardDot, 0.5);
+
+                    // Add triangle indices
+                    indices.push(vertexIndex, vertexIndex + 1, vertexIndex + 2);
+                    vertexIndex += 3;
+
+                    // Accumulate center
+                    centerX += (v0.x + v1.x + v2.x) / 3;
+                    centerY += (v0.y + v1.y + v2.y) / 3;
+                    centerZ += (v0.z + v1.z + v2.z) / 3;
+                    vertCount++;
+                }
+            });
+
+            if (vertexIndex === 0) return null;
+
+            // Update smoothed values for the shock system
+            if (vertCount > 0) {
+                shieldCenter.set(centerX / vertCount, centerY / vertCount, centerZ / vertCount);
+            }
+            shieldNormal.set(-1, 0, 0);
+
+            return {
+                vertices: new Float32Array(vertices),
+                normals: new Float32Array(normals),
+                uvs: new Float32Array(uvs),
+                indices: indices.length > 65535
+                    ? new Uint32Array(indices)
+                    : new Uint16Array(indices)
+            };
+        }
+
+        /**
+         * STEP 4: Generate parametric shock surface geometry
+         * Creates smooth lofted surface from shield boundary
+         * For Apollo: parametric dome shape
+         * For Dream Chaser/X-37B: conformal to heat shield mesh
+         */
+        function generateShockSurfaceGeometry(vehicleType) {
+            const params = SHOCK_PARAMS[vehicleType] || SHOCK_PARAMS.apollo;
+            const R = smoothedRadius;
+
+            // For School Bus (tumbling), use windward-based dynamic shock
+            if (vehicleType === 'schoolbus' && allVehicleMeshes.length > 0) {
+                return generateWindwardShockGeometry(params);
+            }
+
+            // For Dream Chaser, X-37B, and Shuttle, use conformal geometry based on heat shield mesh
+            if ((vehicleType === 'dreamchaser' || vehicleType === 'x37b' || vehicleType === 'shuttle') && heatShieldMeshes.length > 0) {
+                return generateConformalShockGeometry(vehicleType, params);
+            }
+
+            // === APOLLO: Parametric dome shock ===
+
+            // Use the heat shield normal for orientation (computed from mesh vertices)
+            // smoothedShieldNormal points UPSTREAM (away from vehicle, into flow)
+            // We want shock to open DOWNSTREAM, so we negate it for the forward direction
+            const shockAxis = smoothedShieldNormal.clone().negate();  // Points downstream along shield axis
+            // Flip Y component to correct pitch direction
+            shockAxis.y = -shockAxis.y;
+
+            // Compute tangent basis perpendicular to shock axis
+            const up = Math.abs(shockAxis.y) < 0.9
+                ? new THREE.Vector3(0, 1, 0)
+                : new THREE.Vector3(1, 0, 0);
+            const tangentU = new THREE.Vector3().crossVectors(shockAxis, up).normalize();
+            const tangentV = new THREE.Vector3().crossVectors(shockAxis, tangentU).normalize();
+
+            // Debug: log if values seem wrong
+            if (R < 0.1 || smoothedShieldCenter.length() < 0.01) {
+                console.log('Bow shock debug - R:', R, 'center:', smoothedShieldCenter);
+            }
+
+            // Offset the shock center from the heat shield to create proper standoff
+            // Move in +X (forward/downstream) and -Y (down) to stay centered on tilted shield
+            const shockStandoffDistance = R * 0.1;  // Distance in front of shield
+            const shockCenterOffset = new THREE.Vector3(
+                shockStandoffDistance,      // +X: forward/downstream
+                -shockStandoffDistance * 0.3,  // -Y: down to stay centered on pitched shield
+                0                            // Z: no lateral offset
+            );
+            const shockCenter = smoothedShieldCenter.clone().add(shockCenterOffset);
+
+            const standoff = R * params.standoffDistance;
+            const spill = R * params.spillFactor;
+            const curvature = params.curvature;
+            const trailing = standoff * params.trailingLength;
+
+            // Generate vertices for parametric surface
+            // phi: 0 = apex (forward), 1 = rim (at shield edge)
+            // theta: angular position around axis
+
+            const vertices = [];
+            const normals = [];
+            const uvs = [];
+
+            for (let j = 0; j <= PHI_SEGMENTS; j++) {
+                const phi = j / PHI_SEGMENTS;  // 0 to 1
+
+                // Radial distance from axis at this phi
+                // Use sine curve for smooth rounded apex instead of pointed cone
+                const rimExpansion = 1.15;
+                // Sine-based curve: starts at 0 slope (rounded) and smoothly expands
+                const radialDist = R * rimExpansion * Math.sin(phi * Math.PI * 0.5);
+
+                // Forward offset: max at apex, decreases toward rim
+                // Use cosine for smooth spherical-cap shape
+                const forwardOffset = standoff * Math.cos(phi * Math.PI * 0.5);
+
+                // Downstream spill: increases toward rim
+                const spillOffset = spill * Math.pow(phi, 2);
+
+                for (let i = 0; i <= THETA_SEGMENTS; i++) {
+                    const theta = (i / THETA_SEGMENTS) * Math.PI * 2;
+
+                    // Position in shield plane coordinates
+                    const u = Math.cos(theta) * radialDist;
+                    const w = Math.sin(theta) * radialDist;
+
+                    // World position - start from offset shock center
+                    const pos = new THREE.Vector3();
+                    pos.copy(shockCenter);
+                    pos.addScaledVector(tangentU, u);
+                    pos.addScaledVector(tangentV, w);
+                    // Move along shock axis (downstream from shield) - apex in front of vehicle
+                    pos.addScaledVector(shockAxis, forwardOffset);
+                    // Spill wraps back (opposite to shock axis)
+                    pos.addScaledVector(shockAxis, -spillOffset);
+
+                    vertices.push(pos.x, pos.y, pos.z);
+
+                    // Compute surface normal (will be smoothed)
+                    // Normal points outward from the shock surface (along shock axis at apex)
+                    const normalDir = new THREE.Vector3();
+                    // At apex, normal points along shock axis. At rim, more radial.
+                    normalDir.copy(shockAxis).multiplyScalar(1 - phi * 0.5);
+                    normalDir.addScaledVector(tangentU, Math.cos(theta) * phi * 0.5);
+                    normalDir.addScaledVector(tangentV, Math.sin(theta) * phi * 0.5);
+                    normalDir.normalize();
+
+                    normals.push(normalDir.x, normalDir.y, normalDir.z);
+
+                    // UVs for potential texturing
+                    uvs.push(i / THETA_SEGMENTS, phi);
+                }
+            }
+
+            // Generate triangle indices
+            const indices = [];
+            for (let j = 0; j < PHI_SEGMENTS; j++) {
+                for (let i = 0; i < THETA_SEGMENTS; i++) {
+                    const a = j * (THETA_SEGMENTS + 1) + i;
+                    const b = a + THETA_SEGMENTS + 1;
+                    const c = a + 1;
+                    const d = b + 1;
+
+                    // Two triangles per quad
+                    indices.push(a, b, c);
+                    indices.push(c, b, d);
+                }
+            }
+
+            // Add trailing edge extension (downstream plasma spill)
+            if (trailing > 0) {
+                const baseRingStart = PHI_SEGMENTS * (THETA_SEGMENTS + 1);
+                const trailStart = vertices.length / 3;
+
+                for (let i = 0; i <= THETA_SEGMENTS; i++) {
+                    const theta = (i / THETA_SEGMENTS) * Math.PI * 2;
+
+                    // Get rim position
+                    const rimIdx = baseRingStart + i;
+                    const rimX = vertices[rimIdx * 3];
+                    const rimY = vertices[rimIdx * 3 + 1];
+                    const rimZ = vertices[rimIdx * 3 + 2];
+
+                    // Extend along shock axis (downstream from shield)
+                    const trailPos = new THREE.Vector3(rimX, rimY, rimZ);
+                    trailPos.addScaledVector(shockAxis, trailing);
+
+                    vertices.push(trailPos.x, trailPos.y, trailPos.z);
+
+                    // Normal points outward radially
+                    const trailNormal = new THREE.Vector3();
+                    trailNormal.addScaledVector(tangentU, Math.cos(theta));
+                    trailNormal.addScaledVector(tangentV, Math.sin(theta));
+                    trailNormal.normalize();
+                    normals.push(trailNormal.x, trailNormal.y, trailNormal.z);
+
+                    uvs.push(i / THETA_SEGMENTS, 1.2);
+                }
+
+                // Connect trailing edge to rim
+                for (let i = 0; i < THETA_SEGMENTS; i++) {
+                    const rimA = baseRingStart + i;
+                    const rimB = rimA + 1;
+                    const trailA = trailStart + i;
+                    const trailB = trailA + 1;
+
+                    indices.push(rimA, trailA, rimB);
+                    indices.push(rimB, trailA, trailB);
+                }
+            }
+
+            return {
+                vertices: new Float32Array(vertices),
+                normals: new Float32Array(normals),
+                uvs: new Float32Array(uvs),
+                indices: new Uint16Array(indices)
+            };
+        }
+
+        /**
+         * Update debug visualization
+         */
+        function updateDebugVisualization() {
+            if (!debugGroup || !DEBUG_BOW_SHOCK) {
+                if (debugGroup) debugGroup.visible = false;
+                return;
+            }
+
+            debugGroup.visible = true;
+
+            // Update center marker
+            debugCenterMarker.position.copy(smoothedShieldCenter);
+            debugCenterMarker.scale.setScalar(smoothedRadius * 0.08);
+
+            // Update normal arrow
+            debugNormalArrow.position.copy(smoothedShieldCenter);
+            debugNormalArrow.setDirection(smoothedShieldNormal);
+            debugNormalArrow.setLength(smoothedRadius * 1.5, smoothedRadius * 0.2, smoothedRadius * 0.1);
+        }
+
+        // Initialize debug visualization
+        initDebugVisualization();
+
+        // ================================================================
+        // LAYER 1: BOW SHOCK CONTINUOUS SURFACE MESH
+        // ================================================================
+        // Smooth, continuous triangulated surface driven by heat shield
+        // NO particles, billboards, or point clouds
+
+        let shockHalo = null;
+        let shockHaloMaterial = null;
+        let shockHaloGeometry = null;
+
+        /**
+         * Create bow shock material with plasma shader
+         * Supports heat-flux driven opacity, color, and emission
+         */
+        function createBowShockMaterial() {
+            return new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    intensity: { value: 0 },
+                    energyLevel: { value: 0 },
+                    noiseScale: { value: 3.0 },
+                    shieldCenter: { value: new THREE.Vector3() },
+                    shieldNormal: { value: new THREE.Vector3(-1, 0, 0) },
+                    shieldRadius: { value: 2.0 },
+                    flowSpeed: { value: 11.0 }  // 11 km/s hypersonic
+                },
+                vertexShader: `
+                    uniform vec3 shieldCenter;
+                    uniform vec3 shieldNormal;
+                    uniform float shieldRadius;
+                    uniform float time;
+                    uniform float energyLevel;
+
+                    varying vec3 vNormal;
+                    varying vec3 vViewPosition;
+                    varying vec3 vWorldPosition;
+                    varying vec3 vOriginalPosition;
+                    varying float vApexFactor;
+                    varying float vEdgeFactor;
+                    varying vec2 vUv;
+
+                    // Fast hash for vertex displacement
+                    float hash(vec3 p) {
+                        p = fract(p * 0.3183099 + 0.1);
+                        p *= 17.0;
+                        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+                    }
+
+                    float noise(vec3 p) {
+                        vec3 i = floor(p);
+                        vec3 f = fract(p);
+                        f = f * f * (3.0 - 2.0 * f);
+                        return mix(
+                            mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
+                                mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                            mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                                mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+                    }
+
+                    // FBM for multi-scale turbulence
+                    float fbm(vec3 p) {
+                        float value = 0.0;
+                        float amplitude = 0.5;
+                        for (int i = 0; i < 4; i++) {
+                            value += amplitude * noise(p);
+                            p *= 2.0;
+                            amplitude *= 0.5;
+                        }
+                        return value;
+                    }
+
+                    void main() {
+                        vUv = uv;
+                        vOriginalPosition = position;
+
+                        // =====================================================
+                        // 1. ANIMATED VERTEX DISPLACEMENT - Hypersonic ripples
+                        // =====================================================
+                        vec3 displacedPos = position;
+
+                        // Only displace if there's heat
+                        if (energyLevel > 0.05) {
+                            // Hypersonic flow speed - extremely fast downstream motion
+                            float flowTime = time * 15.0;  // Very fast flow
+
+                            // Multiple wave frequencies for turbulent appearance
+                            vec3 noiseCoord = position * 0.3 + vec3(flowTime * 0.5, flowTime * 0.3, flowTime * 0.4);
+
+                            // Displacement along normal - rippling surface
+                            float ripple = fbm(noiseCoord) * 2.0 - 1.0;
+
+                            // Add high-frequency flutter
+                            float flutter = sin(position.x * 8.0 + time * 40.0) *
+                                          cos(position.y * 6.0 + time * 35.0) * 0.3;
+
+                            // Displacement strength based on edge factor and energy
+                            float edgeFactor = uv.y;
+                            float displacementStrength = energyLevel * 0.15 * (0.3 + edgeFactor * 0.7);
+
+                            // Apply displacement along normal
+                            displacedPos += normal * (ripple + flutter) * displacementStrength * shieldRadius;
+                        }
+
+                        vec4 worldPos = modelMatrix * vec4(displacedPos, 1.0);
+                        vWorldPosition = worldPos.xyz;
+                        vNormal = normalize(normalMatrix * normal);
+
+                        // Compute factors for shading
+                        vec3 toVertex = worldPos.xyz - shieldCenter;
+                        float forwardDist = dot(toVertex, shieldNormal);
+                        vApexFactor = clamp(forwardDist / (shieldRadius * 0.5), 0.0, 1.0);
+                        vEdgeFactor = uv.y;
+
+                        vec4 mvPosition = modelViewMatrix * vec4(displacedPos, 1.0);
+                        vViewPosition = -mvPosition.xyz;
+
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform float intensity;
+                    uniform float energyLevel;
+                    uniform float noiseScale;
+                    uniform float flowSpeed;
+
+                    varying vec3 vNormal;
+                    varying vec3 vViewPosition;
+                    varying vec3 vWorldPosition;
+                    varying vec3 vOriginalPosition;
+                    varying float vApexFactor;
+                    varying float vEdgeFactor;
+                    varying vec2 vUv;
+
+                    // =====================================================
+                    // NOISE FUNCTIONS FOR HYPERSONIC TURBULENCE
+                    // =====================================================
+                    float hash(vec3 p) {
+                        p = fract(p * 0.3183099 + 0.1);
+                        p *= 17.0;
+                        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+                    }
+
+                    float noise(vec3 p) {
+                        vec3 i = floor(p);
+                        vec3 f = fract(p);
+                        f = f * f * (3.0 - 2.0 * f);
+                        return mix(
+                            mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
+                                mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                            mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                                mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+                    }
+
+                    // 2. ENHANCED FLOWING NOISE - Multi-octave FBM
+                    float fbm(vec3 p, int octaves) {
+                        float value = 0.0;
+                        float amplitude = 0.5;
+                        float frequency = 1.0;
+                        for (int i = 0; i < 6; i++) {
+                            if (i >= octaves) break;
+                            value += amplitude * noise(p * frequency);
+                            frequency *= 2.0;
+                            amplitude *= 0.5;
+                        }
+                        return value;
+                    }
+
+                    // Advected noise - flows downstream rapidly
+                    float flowingNoise(vec3 p, float flowTime) {
+                        // Primary flow direction (downstream)
+                        vec3 flow1 = p + vec3(flowTime * 2.0, flowTime * 0.3, flowTime * 0.5);
+                        // Secondary turbulent flow
+                        vec3 flow2 = p + vec3(flowTime * 1.5, -flowTime * 0.5, flowTime * 0.8);
+                        // Combine for turbulent advection
+                        return fbm(flow1, 4) * 0.6 + fbm(flow2 * 1.5, 3) * 0.4;
+                    }
+
+                    void main() {
+                        // Hypersonic time scales - everything moves FAST
+                        float hyperTime = time * flowSpeed;
+
+                        // =====================================================
+                        // 5. EDGE FLICKERING/PULSING - Animated Fresnel
+                        // =====================================================
+                        vec3 viewDir = normalize(vViewPosition);
+                        float baseFresnel = pow(1.0 - abs(dot(viewDir, vNormal)), 2.5);
+
+                        // Rapid edge flickering - plasma instability
+                        float flicker = sin(time * 60.0 + vOriginalPosition.x * 10.0) * 0.5 + 0.5;
+                        float flicker2 = sin(time * 45.0 + vOriginalPosition.y * 8.0) * 0.5 + 0.5;
+                        float flickerMix = flicker * flicker2;
+
+                        // Pulsing fresnel with high-frequency variation
+                        float pulseFreq = sin(time * 25.0) * 0.3 + 0.7;
+                        float fresnel = baseFresnel * (0.7 + flickerMix * 0.6) * pulseFreq;
+
+                        // Apex fade
+                        float apexFade = smoothstep(1.2, 0.0, vEdgeFactor);
+
+                        // =====================================================
+                        // 2. ENHANCED FLOWING NOISE - Hypersonic turbulence
+                        // =====================================================
+                        vec3 noisePos = vWorldPosition * noiseScale * 0.5;
+
+                        // Multi-layer flowing turbulence at hypersonic speeds
+                        float turb1 = flowingNoise(noisePos, hyperTime * 0.8);
+                        float turb2 = flowingNoise(noisePos * 2.0, hyperTime * 1.2);
+                        float turb3 = flowingNoise(noisePos * 4.0, hyperTime * 1.8);
+
+                        // Combine turbulence layers
+                        float turbulence = turb1 * 0.5 + turb2 * 0.3 + turb3 * 0.2;
+
+                        // High-frequency shimmer for that "roaring plasma" look
+                        float shimmer = turbulence * 0.4 + 0.8;
+                        shimmer += sin(hyperTime * 3.0 + vUv.x * 20.0) * 0.1;
+
+                        // =====================================================
+                        // PHYSICALLY-INSPIRED INTENSITY GROWTH MODEL
+                        // =====================================================
+                        float H_norm = clamp(energyLevel, 0.0, 1.0);
+                        float GrowthExponent = 1.2;
+                        float GrowthValue = pow(H_norm, GrowthExponent);
+                        float SaturationSteepness = 8.0;
+                        float SaturationCenter = 0.25;
+                        float SaturationValue = 1.0 / (1.0 + exp(-SaturationSteepness * (GrowthValue - SaturationCenter)));
+                        float earlyGlow = H_norm * 0.15;
+                        float FinalIntensity = clamp(max(SaturationValue, earlyGlow), 0.0, 1.0);
+
+                        // =====================================================
+                        // COLOR EVOLUTION with turbulence variation
+                        // =====================================================
+                        vec3 color0 = vec3(0.45, 0.45, 0.45);
+                        vec3 color1 = vec3(0.52, 0.48, 0.48);
+                        vec3 color2 = vec3(0.72, 0.52, 0.58);
+                        vec3 color3 = vec3(0.88, 0.48, 0.68);
+                        vec3 color4 = vec3(0.88, 0.38, 0.88);
+                        vec3 color5 = vec3(0.88, 0.32, 0.98);
+                        vec3 color6 = vec3(0.95, 0.40, 1.00);
+
+                        // Add turbulence to color selection for swirling effect
+                        float colorIntensity = FinalIntensity + (turbulence - 0.5) * 0.15 * FinalIntensity;
+                        colorIntensity = clamp(colorIntensity, 0.0, 1.0);
+
+                        vec3 PlasmaColor;
+                        if (colorIntensity < 0.15) {
+                            PlasmaColor = mix(color0, color1, colorIntensity / 0.15);
+                        } else if (colorIntensity < 0.30) {
+                            PlasmaColor = mix(color1, color2, (colorIntensity - 0.15) / 0.15);
+                        } else if (colorIntensity < 0.50) {
+                            PlasmaColor = mix(color2, color3, (colorIntensity - 0.30) / 0.20);
+                        } else if (colorIntensity < 0.70) {
+                            PlasmaColor = mix(color3, color4, (colorIntensity - 0.50) / 0.20);
+                        } else if (colorIntensity < 0.85) {
+                            PlasmaColor = mix(color4, color5, (colorIntensity - 0.70) / 0.15);
+                        } else {
+                            PlasmaColor = mix(color5, color6, (colorIntensity - 0.85) / 0.15);
+                        }
+
+                        // =====================================================
+                        // 4. LAYERED SURFACES - Simulated depth layers
+                        // =====================================================
+                        // Create illusion of multiple plasma layers at different depths
+                        float layer1 = flowingNoise(noisePos * 1.0, hyperTime * 0.6);
+                        float layer2 = flowingNoise(noisePos * 1.5 + vec3(0.5), hyperTime * 0.9);
+                        float layer3 = flowingNoise(noisePos * 2.0 + vec3(1.0), hyperTime * 1.2);
+
+                        // Each layer has different opacity and color shift
+                        float layerMix = layer1 * 0.4 + layer2 * 0.35 + layer3 * 0.25;
+
+                        // Depth-based color variation (deeper = more violet)
+                        vec3 depthColor = mix(PlasmaColor, color5, layerMix * 0.3 * FinalIntensity);
+
+                        // =====================================================
+                        // EMISSIVE BOOST with flickering
+                        // =====================================================
+                        float EmissiveStrength = pow(FinalIntensity, 1.2);
+                        // Add rapid emissive flicker
+                        EmissiveStrength *= (0.85 + flickerMix * 0.3);
+
+                        // Apply all effects
+                        vec3 shockColor = depthColor * shimmer * (1.0 + EmissiveStrength * 0.6);
+
+                        // =====================================================
+                        // FINAL ALPHA with layer depth
+                        // =====================================================
+                        float surfaceAlpha = 0.3 * FinalIntensity;
+                        float edgeAlpha = fresnel * 0.6 * FinalIntensity;
+
+                        // Layer-based alpha variation for depth
+                        float layerAlpha = (0.8 + layerMix * 0.4);
+
+                        float alpha = (surfaceAlpha + edgeAlpha) * apexFade * layerAlpha;
+
+                        // Minimum alpha threshold with flicker
+                        float alphaThreshold = 0.01 + flickerMix * 0.005;
+                        if (alpha < alphaThreshold) discard;
+
+                        gl_FragColor = vec4(shockColor, alpha);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                side: THREE.DoubleSide,
+                depthWrite: false
+            });
+        }
+
+        /**
+         * Create initial bow shock mesh
+         * Geometry will be updated each frame from heat shield vertices
+         */
+        function createShockHalo() {
+            // Create initial geometry (will be rebuilt each frame)
+            shockHaloGeometry = new THREE.BufferGeometry();
+
+            // Create material
+            shockHaloMaterial = createBowShockMaterial();
+
+            shockHalo = new THREE.Mesh(shockHaloGeometry, shockHaloMaterial);
+            shockHalo.visible = false;
+            shockHalo.frustumCulled = false;
+            scene.add(shockHalo);
+        }
+
+        /**
+         * Rebuild bow shock geometry using parametric surface
+         * Creates smooth, continuous triangulated mesh
+         */
+        function rebuildBowShockGeometry(vehicleType) {
+            const surfaceData = generateShockSurfaceGeometry(vehicleType);
+
+            // Handle null return (no valid geometry)
+            if (!surfaceData || !surfaceData.vertices || surfaceData.vertices.length === 0) {
+                return;
+            }
+
+            // Dispose old geometry buffers
+            if (shockHaloGeometry) {
+                shockHaloGeometry.dispose();
+            }
+
+            shockHaloGeometry = new THREE.BufferGeometry();
+
+            shockHaloGeometry.setAttribute('position',
+                new THREE.BufferAttribute(surfaceData.vertices, 3));
+            shockHaloGeometry.setAttribute('normal',
+                new THREE.BufferAttribute(surfaceData.normals, 3));
+            shockHaloGeometry.setAttribute('uv',
+                new THREE.BufferAttribute(surfaceData.uvs, 2));
+            shockHaloGeometry.setIndex(
+                new THREE.BufferAttribute(surfaceData.indices, 1));
+
+            // Recompute normals for smooth shading
+            shockHaloGeometry.computeVertexNormals();
+
+            // Update mesh reference
+            shockHalo.geometry = shockHaloGeometry;
+        }
+
+        /**
+         * Update bow shock based on heat flux
+         * Generates continuous surface mesh from heat shield geometry
+         *
+         * @param {number} flux - Current heat flux
+         * @param {number} dt - Delta time
+         */
+        function updateShockHalo(flux, dt) {
+            if (!shockHalo || !shockHaloMaterial) return;
+
+            const energyLevel = Math.max(0, (flux - 300) / (PEAK_HEAT_FLUX - 300));
+
+            shockHalo.visible = flux > 300;
+
+            // Check if we have any meshes to work with (either heat shield or dynamic)
+            const hasMeshes = heatShieldMeshes.length > 0 || allVehicleMeshes.length > 0;
+
+            if (shockHalo.visible && hasMeshes) {
+                // Update shader uniforms
+                shockHaloMaterial.uniforms.time.value += dt;
+                shockHaloMaterial.uniforms.intensity.value = 0.6 + energyLevel * 0.7;
+                shockHaloMaterial.uniforms.energyLevel.value = energyLevel;
+
+                // Vehicle velocity vector (world space)
+                const velocityVector = new THREE.Vector3(1, 0, 0);
+
+                // Get vehicle type for specific parameters
+                const vehicleType = getVehicleType();
+
+                // For school bus (tumbling), use dynamic windward detection
+                if (vehicleType === 'schoolbus' && allVehicleMeshes.length > 0) {
+                    // Windward shock generation handles its own vertex extraction
+                    // Just set reasonable defaults for smoothing
+                    if (smoothedShieldCenter.lengthSq() < 0.001) {
+                        // Initialize from vehicle center
+                        if (currentVehicle) {
+                            const box = new THREE.Box3().setFromObject(currentVehicle);
+                            box.getCenter(smoothedShieldCenter);
+                            smoothedRadius = box.getSize(new THREE.Vector3()).length() / 2;
+                        }
+                    }
+                } else if (heatShieldMeshes.length > 0) {
+                    // STEP 1: Extract heat shield vertices in world space
+                    const worldVerts = extractHeatShieldVerticesWorld(heatShieldMeshes[0]);
+                    cachedWorldVerts = worldVerts;  // Cache for conformal shock generation
+
+                    // STEP 2: Compute shield plane (centroid + normal via PCA)
+                    computeShieldPlane(worldVerts, velocityVector);
+
+                    // STEP 3: Compute radial profile
+                    computeShieldRadialProfile(worldVerts);
+                }
+
+                // Smooth values for stable rendering
+                // On first frame (values at origin), snap to actual values
+                if (smoothedShieldCenter.lengthSq() < 0.001) {
+                    smoothedShieldCenter.copy(shieldCenter);
+                    smoothedShieldNormal.copy(shieldNormal);
+                    smoothedRadius = maxShieldRadius;
+                } else {
+                    const smoothingFactor = 1.0 - Math.exp(-8.0 * dt);
+                    smoothedShieldCenter.lerp(shieldCenter, smoothingFactor);
+                    smoothedShieldNormal.lerp(shieldNormal, smoothingFactor).normalize();
+                    smoothedRadius += (maxShieldRadius - smoothedRadius) * smoothingFactor;
+                }
+
+                // STEP 4-8: Generate parametric shock surface
+                rebuildBowShockGeometry(vehicleType);
+
+                // Debug output (first few frames only)
+                if (shockHalo.userData.debugCount === undefined) {
+                    shockHalo.userData.debugCount = 0;
+                }
+                if (shockHalo.userData.debugCount < 5) {
+                    console.log('Bow shock generated:', {
+                        center: smoothedShieldCenter.toArray(),
+                        normal: smoothedShieldNormal.toArray(),
+                        radius: smoothedRadius,
+                        vehicleType: vehicleType,
+                        vertexCount: shockHaloGeometry.attributes.position?.count
+                    });
+                    shockHalo.userData.debugCount++;
+                }
+
+                // Update shader uniforms
+                shockHaloMaterial.uniforms.shieldCenter.value.copy(smoothedShieldCenter);
+                shockHaloMaterial.uniforms.shieldNormal.value.copy(smoothedShieldNormal);
+                shockHaloMaterial.uniforms.shieldRadius.value = smoothedRadius;
+
+                // Update debug visualization
+                updateDebugVisualization();
+            }
+        }
+
+        // Initialize bow shock
+        createShockHalo();
+
+        // ================================================================
+        // LAYER 2: HIGH ENERGY PLASMA STREAM EMITTER
+        // ================================================================
+        // Dense, bright ionized gas flow immediately behind shock layer
+
+        class PlasmaParticle {
+            constructor() {
+                this.position = new THREE.Vector3();
+                this.velocity = new THREE.Vector3();
+                this.initialVelocity = new THREE.Vector3();
+                this.age = 0;
+                this.maxAge = 0;
+                this.color = new THREE.Color();
+                this.spawnColor = new THREE.Color();
+                this.baseSize = 0;
+                this.currentSize = 0;
+                this.alpha = 0;
+                this.brightness = 1.0;
+                this.stretch = 1.0;
+                this.active = false;
+                this.noisePhase = 0;
+            }
+
+            reset(position, velocity, maxAge, color, baseSize) {
+                this.position.copy(position);
+                this.velocity.copy(velocity);
+                this.initialVelocity.copy(velocity);
+                this.age = 0;
+                this.maxAge = maxAge;
+                this.color.copy(color);
+                this.spawnColor.copy(color);
+                this.baseSize = baseSize;
+                this.currentSize = baseSize;
+                this.alpha = 0;
+                this.brightness = 8.0; // Very bright plasma
+                this.stretch = 3.0;    // Highly elongated
+                this.active = true;
+                this.noisePhase = Math.random() * 100;
+            }
+
+            /**
+             * Plasma particle update with 4-stage lifecycle
+             * Stage A (0-20%): Maximum emissive, bloom
+             * Stage B (20-50%): Reducing emissive, streak elongation
+             * Stage C (50-80%): No emissive, color cooling
+             * Stage D (80-100%): Fade into soot handoff
+             */
+            update(dt) {
+                this.age += dt;
+                if (this.age >= this.maxAge) {
+                    this.active = false;
+                    return;
+                }
+
+                const t = this.age / this.maxAge;
+
+                // Velocity decay - strong downstream deceleration
+                const decayRate = 2.5;
+                const velocityFactor = Math.exp(-decayRate * t);
+                this.velocity.copy(this.initialVelocity).multiplyScalar(velocityFactor);
+
+                // Mild perpendicular turbulence with streak breakup
+                this.noisePhase += dt * 2.0;
+                const noiseAmp = smoothstep(0.3, 0.7, t) * 0.8;
+                const noiseY = Math.sin(this.noisePhase * 1.7) * noiseAmp * dt;
+                const noiseZ = Math.cos(this.noisePhase * 1.1) * noiseAmp * dt;
+                this.position.y += noiseY;
+                this.position.z += noiseZ;
+
+                // Position update
+                this.position.addScaledVector(this.velocity, dt);
+
+                // BRIGHTNESS by stage
+                if (t < 0.20) {
+                    // Stage A: Maximum emissive - BLOOM
+                    this.brightness = 8.0;
+                } else if (t < 0.50) {
+                    // Stage B: Reducing emissive
+                    const stageT = (t - 0.20) / 0.30;
+                    this.brightness = 8.0 - stageT * 5.5; // 8 → 2.5
+                } else if (t < 0.80) {
+                    // Stage C: No emissive glow
+                    const stageT = (t - 0.50) / 0.30;
+                    this.brightness = 2.5 - stageT * 1.5; // 2.5 → 1.0
+                } else {
+                    // Stage D: Handoff to soot
+                    this.brightness = 1.0;
+                }
+
+                // COLOR gradient: White/Yellow → Pink → Magenta → Violet → Blue → Dark
+                if (t < 0.15) {
+                    // White/Yellow plasma core
+                    this.color.setRGB(1.0, 0.95, 0.8);
+                } else if (t < 0.30) {
+                    const ct = (t - 0.15) / 0.15;
+                    this.color.lerpColors(new THREE.Color(1.0, 0.95, 0.8), PLASMA_PINK, ct);
+                } else if (t < 0.45) {
+                    const ct = (t - 0.30) / 0.15;
+                    this.color.copy(PLASMA_PINK).lerp(PLASMA_VIOLET, ct);
+                } else if (t < 0.60) {
+                    const ct = (t - 0.45) / 0.15;
+                    this.color.copy(PLASMA_VIOLET).lerp(PLASMA_BLUE, ct);
+                } else if (t < 0.80) {
+                    const ct = (t - 0.60) / 0.20;
+                    this.color.copy(PLASMA_BLUE).lerp(new THREE.Color(0.25, 0.25, 0.35), ct);
+                } else {
+                    this.color.setRGB(0.2, 0.2, 0.25);
+                }
+
+                // OPACITY curve
+                if (t < 0.08) {
+                    this.alpha = (t / 0.08) * 0.98;
+                } else if (t < 0.60) {
+                    this.alpha = 0.98;
+                } else {
+                    const fadeT = (t - 0.60) / 0.40;
+                    this.alpha = 0.98 * Math.exp(-2.5 * fadeT);
+                }
+
+                // STRETCH - elongated early, reduces over time
+                if (t < 0.20) {
+                    this.stretch = 3.0;
+                } else if (t < 0.50) {
+                    const st = (t - 0.20) / 0.30;
+                    this.stretch = 3.0 - st * 1.2; // 3.0 → 1.8
+                } else {
+                    const st = (t - 0.50) / 0.50;
+                    this.stretch = 1.8 - st * 0.6; // 1.8 → 1.2
+                }
+
+                // SIZE - tight near vehicle, slight expansion
+                this.currentSize = this.baseSize * (1.0 + t * 1.5);
+
+                if (this.alpha < 0.01) this.active = false;
+            }
+        }
+
+        class PlasmaEmitter {
+            constructor(maxParticles = 3000) {
+                this.maxParticles = maxParticles;
+                this.particles = [];
+                this.accumulator = 0;
+
+                for (let i = 0; i < maxParticles; i++) {
+                    this.particles.push(new PlasmaParticle());
+                }
+
+                this.createGeometry();
+            }
+
+            createGeometry() {
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(this.maxParticles * 3);
+                const colors = new Float32Array(this.maxParticles * 3);
+                const sizes = new Float32Array(this.maxParticles);
+                const alphas = new Float32Array(this.maxParticles);
+                const stretches = new Float32Array(this.maxParticles);
+
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+                geometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
+                geometry.setAttribute('stretch', new THREE.BufferAttribute(stretches, 1));
+
+                // High-energy plasma shader with bloom support
+                const material = new THREE.ShaderMaterial({
+                    uniforms: {
+                        pointTexture: { value: this.createPlasmaTexture() }
+                    },
+                    vertexShader: `
+                        attribute float size;
+                        attribute float alpha;
+                        attribute float stretch;
+                        attribute vec3 color;
+
+                        varying vec3 vColor;
+                        varying float vAlpha;
+                        varying float vStretch;
+
+                        void main() {
+                            vColor = color;
+                            vAlpha = alpha;
+                            vStretch = stretch;
+
+                            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                            gl_PointSize = size * stretch * (320.0 / -mvPosition.z);
+                            gl_Position = projectionMatrix * mvPosition;
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform sampler2D pointTexture;
+                        varying vec3 vColor;
+                        varying float vAlpha;
+                        varying float vStretch;
+
+                        void main() {
+                            vec2 uv = gl_PointCoord;
+                            uv.x = (uv.x - 0.5) / max(vStretch * 0.4, 0.4) + 0.5;
+                            if (uv.x < 0.0 || uv.x > 1.0) discard;
+
+                            vec4 tex = texture2D(pointTexture, uv);
+                            gl_FragColor = vec4(vColor, vAlpha * tex.a);
+                        }
+                    `,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    depthTest: true
+                });
+
+                this.mesh = new THREE.Points(geometry, material);
+                scene.add(this.mesh);
+            }
+
+            createPlasmaTexture() {
+                const canvas = document.createElement('canvas');
+                const size = 128;
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+
+                const gradient = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+                gradient.addColorStop(0.1, 'rgba(255, 255, 255, 0.95)');
+                gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.6)');
+                gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.2)');
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, size, size);
+
+                return new THREE.CanvasTexture(canvas);
+            }
+
+            emit(flux) {
+                // Check if we have spawn points (regular heat shield or dynamic windward)
+                const hasDynamicHeating = currentVehicleConfig && currentVehicleConfig.dynamicHeatShield;
+                const hasSpawnPoints = heatShieldVertices.length > 0 ||
+                    (hasDynamicHeating && cachedWindwardVertices.length > 0);
+
+                if (flux < 800 || !hasSpawnPoints) return;
+
+                let particle = null;
+                for (let i = 0; i < this.maxParticles; i++) {
+                    if (!this.particles[i].active) {
+                        particle = this.particles[i];
+                        break;
+                    }
+                }
+                if (!particle) return;
+
+                // Spawn at heat shield or windward vertex
+                let spawnPos;
+                if (hasDynamicHeating && cachedWindwardVertices.length > 0) {
+                    // Use cached windward vertices for dynamic heating
+                    const windwardVert = cachedWindwardVertices[
+                        Math.floor(Math.random() * cachedWindwardVertices.length)
+                    ];
+                    spawnPos = windwardVert.position.clone();
+                } else {
+                    // Use regular heat shield vertices
+                    const vertexLocal = heatShieldVertices[
+                        Math.floor(Math.random() * heatShieldVertices.length)
+                    ].clone();
+                    if (heatShieldMeshes.length > 0) {
+                        vertexLocal.applyMatrix4(heatShieldMeshes[0].matrixWorld);
+                    }
+                    spawnPos = vertexLocal;
+                }
+
+                // Small spawn offset
+                spawnPos.x += (Math.random() - 0.5) * 0.05;
+                spawnPos.y += (Math.random() - 0.5) * 0.05;
+                spawnPos.z += (Math.random() - 0.5) * 0.05;
+
+                // High velocity, very directional
+                const speed = 35 + Math.random() * 15;
+                const velocity = new THREE.Vector3(
+                    -speed,
+                    (Math.random() - 0.5) * 0.3,
+                    (Math.random() - 0.5) * 0.3
+                );
+
+                const baseSize = 0.3 + Math.random() * 0.15;
+                const maxAge = (1.5 + Math.random() * 1.0) * trailLengthMultiplier;
+
+                particle.reset(spawnPos, velocity, maxAge, cachedHeatShieldColor, baseSize);
+            }
+
+            update(dt, flux) {
+                // Spawn rate scales with heat flux
+                let spawnRate = 0;
+                if (flux >= 800) {
+                    const normalized = (flux - 800) / (PEAK_HEAT_FLUX - 800);
+                    spawnRate = 100 + normalized * 400; // Dense near peak
+                }
+
+                this.accumulator += spawnRate * dt;
+                while (this.accumulator >= 1) {
+                    this.emit(flux);
+                    this.accumulator -= 1;
+                }
+
+                let activeCount = 0;
+                for (let i = 0; i < this.maxParticles; i++) {
+                    if (this.particles[i].active) {
+                        this.particles[i].update(dt);
+                        activeCount++;
+                    }
+                }
+
+                this.updateBuffers();
+                return activeCount;
+            }
+
+            updateBuffers() {
+                const geo = this.mesh.geometry;
+                const positions = geo.attributes.position.array;
+                const colors = geo.attributes.color.array;
+                const sizes = geo.attributes.size.array;
+                const alphas = geo.attributes.alpha.array;
+                const stretches = geo.attributes.stretch.array;
+
+                let idx = 0;
+                for (let i = 0; i < this.maxParticles; i++) {
+                    const p = this.particles[i];
+                    if (p.active) {
+                        positions[idx * 3] = p.position.x;
+                        positions[idx * 3 + 1] = p.position.y;
+                        positions[idx * 3 + 2] = p.position.z;
+
+                        colors[idx * 3] = p.color.r * p.brightness;
+                        colors[idx * 3 + 1] = p.color.g * p.brightness;
+                        colors[idx * 3 + 2] = p.color.b * p.brightness;
+
+                        sizes[idx] = p.currentSize;
+                        alphas[idx] = p.alpha;
+                        stretches[idx] = p.stretch;
+                        idx++;
+                    }
+                }
+
+                for (let i = idx; i < this.maxParticles; i++) {
+                    sizes[i] = 0;
+                    alphas[i] = 0;
+                }
+
+                geo.attributes.position.needsUpdate = true;
+                geo.attributes.color.needsUpdate = true;
+                geo.attributes.size.needsUpdate = true;
+                geo.attributes.alpha.needsUpdate = true;
+                geo.attributes.stretch.needsUpdate = true;
+            }
+
+            clear() {
+                for (let i = 0; i < this.maxParticles; i++) {
+                    this.particles[i].active = false;
+                }
+                this.updateBuffers();
+            }
+        }
+
+        const plasmaEmitter = new PlasmaEmitter(3000);
+
+        // Smoothstep helper
+        function smoothstep(edge0, edge1, x) {
+            const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+            return t * t * (3 - 2 * t);
+        }
+
+        // Get heat color based on flux
+        function getHeatColor(flux) {
+            const c = new THREE.Color();
+            if (flux < 400) c.lerpColors(COLOR_COLD, COLOR_DARK_RED, flux / 400);
+            else if (flux < 1000) c.lerpColors(COLOR_DARK_RED, COLOR_RED, (flux - 400) / 600);
+            else if (flux < 1800) c.lerpColors(COLOR_RED, COLOR_ORANGE, (flux - 1000) / 800);
+            else if (flux < 2600) c.lerpColors(COLOR_ORANGE, COLOR_YELLOW, (flux - 1800) / 800);
+            else c.lerpColors(COLOR_YELLOW, COLOR_WHITE, Math.min((flux - 2600) / 1400, 1));
+            return c;
+        }
+
+        // Heat shield material
+        function createHeatShieldMaterial() {
+            return new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    heatFlux: { value: 0 },
+                    maxHeatFlux: { value: 4000.0 },
+                    baseColor: { value: new THREE.Color(0x2a2a2a) },  // Original dark grey
+                    charColor: { value: new THREE.Color(0x1a1a1a) },  // Deep char black
+                    emberColor: { value: new THREE.Color(0xff4400) }, // Hot ember orange
+                    glowColor: { value: new THREE.Color(0xff2200) },  // Deep red glow
+                    ambientLight: { value: new THREE.Color(0x404040) },
+                    lightDir: { value: new THREE.Vector3(1, 1, 1).normalize() },
+                    lightColor: { value: new THREE.Color(0xffffff) }
+                },
+                vertexShader: `
+                    varying vec3 vNormal;
+                    varying vec3 vWorldPosition;
+                    varying vec2 vUv;
+                    varying vec3 vViewDir;
+
+                    void main() {
+                        vNormal = normalize(normalMatrix * normal);
+                        vUv = uv;
+
+                        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                        vWorldPosition = worldPos.xyz;
+
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        vViewDir = -mvPosition.xyz;
+
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform float heatFlux;
+                    uniform float maxHeatFlux;
+                    uniform vec3 baseColor;
+                    uniform vec3 charColor;
+                    uniform vec3 emberColor;
+                    uniform vec3 glowColor;
+                    uniform vec3 ambientLight;
+                    uniform vec3 lightDir;
+                    uniform vec3 lightColor;
+
+                    varying vec3 vNormal;
+                    varying vec3 vWorldPosition;
+                    varying vec2 vUv;
+                    varying vec3 vViewDir;
+
+                    // Noise functions for procedural patterns
+                    float hash(vec3 p) {
+                        p = fract(p * 0.3183099 + 0.1);
+                        p *= 17.0;
+                        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+                    }
+
+                    float noise(vec3 p) {
+                        vec3 i = floor(p);
+                        vec3 f = fract(p);
+                        f = f * f * (3.0 - 2.0 * f);
+                        return mix(
+                            mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
+                                mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                            mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                                mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+                    }
+
+                    // FBM for multi-scale char patterns
+                    float fbm(vec3 p) {
+                        float value = 0.0;
+                        float amplitude = 0.5;
+                        for (int i = 0; i < 5; i++) {
+                            value += amplitude * noise(p);
+                            p *= 2.0;
+                            amplitude *= 0.5;
+                        }
+                        return value;
+                    }
+
+                    // Cellular/Voronoi-like pattern for char cracks
+                    float cellPattern(vec3 p) {
+                        vec3 i = floor(p);
+                        vec3 f = fract(p);
+                        float minDist = 1.0;
+                        for (int x = -1; x <= 1; x++) {
+                            for (int y = -1; y <= 1; y++) {
+                                for (int z = -1; z <= 1; z++) {
+                                    vec3 neighbor = vec3(float(x), float(y), float(z));
+                                    vec3 point = neighbor + hash(i + neighbor) - f;
+                                    float dist = length(point);
+                                    minDist = min(minDist, dist);
+                                }
+                            }
+                        }
+                        return minDist;
+                    }
+
+                    void main() {
+                        float heatLevel = clamp(heatFlux / maxHeatFlux, 0.0, 1.0);
+
+                        // =====================================================
+                        // 3. PROCEDURAL CHAR PATTERNS
+                        // =====================================================
+                        vec3 noiseCoord = vWorldPosition * 0.15;
+
+                        // Multi-scale char pattern
+                        float charPattern = fbm(noiseCoord * 2.0);
+
+                        // Add cellular cracks at higher heat
+                        float cracks = cellPattern(noiseCoord * 3.0);
+                        float crackIntensity = smoothstep(0.0, 0.15, cracks);
+
+                        // Streaky ablation pattern (flowing downstream in X direction)
+                        float streaks = fbm(vec3(noiseCoord.x * 0.5, noiseCoord.y * 2.0, noiseCoord.z * 2.0));
+
+                        // Combine patterns
+                        float combinedPattern = charPattern * 0.6 + streaks * 0.4;
+
+                        // =====================================================
+                        // 1. PROGRESSIVE COLOR DARKENING (Light Application)
+                        // =====================================================
+                        // Very subtle darkening - just a hint of char
+                        float charAmount = heatLevel * 0.3 * combinedPattern;  // Light application
+                        charAmount = clamp(charAmount, 0.0, 0.4);  // Cap at 40% char
+
+                        vec3 surfaceColor = mix(baseColor, charColor, charAmount);
+
+                        // =====================================================
+                        // 2. GLOWING EMBERS THROUGH CHAR (subtle at low heat)
+                        // =====================================================
+                        // Embers only appear at higher heat flux
+                        float emberThreshold = 0.3;
+                        float emberStrength = smoothstep(emberThreshold, 0.8, heatLevel);
+
+                        // Ember pattern - hot spots peeking through cracks
+                        float emberPattern = (1.0 - crackIntensity) * combinedPattern;
+                        emberPattern += noise(noiseCoord * 8.0 + time * 2.0) * 0.3;  // Flickering
+
+                        // Ember glow with pulsing
+                        float pulse = sin(time * 8.0 + vWorldPosition.x * 3.0) * 0.15 + 0.85;
+                        float emberGlow = emberStrength * emberPattern * pulse;
+                        emberGlow = clamp(emberGlow, 0.0, 1.0);
+
+                        // Color of embers - orange to red based on intensity
+                        vec3 emberFinal = mix(glowColor, emberColor, emberGlow * 0.5);
+
+                        // =====================================================
+                        // 3. INTENSE THERMAL RADIATION (white-hot at peak)
+                        // =====================================================
+                        // Thermal radiation color progression: dull red → orange → yellow → white
+                        // Based on blackbody radiation temperature progression
+
+                        // Start glow at ~200 kW/m² (5% of 4000 max)
+                        float thermalStart = 0.05;
+                        float thermalIntensity = smoothstep(thermalStart, 1.0, heatLevel);
+
+                        // Intensity curve - visible early, grows to very bright at peak
+                        // Use sqrt for early visibility, then boost at high end
+                        float earlyGlow = sqrt(thermalIntensity) * 1.5;  // Visible early
+                        float peakGlow = pow(thermalIntensity, 2.0) * 4.0;  // Intense at peak
+                        float intensityCurve = earlyGlow + peakGlow;
+
+                        // Define thermal color stages (blackbody-inspired)
+                        vec3 dullRed = vec3(0.5, 0.08, 0.03);      // ~800K - visible red
+                        vec3 cherryRed = vec3(0.85, 0.18, 0.06);   // ~1000K
+                        vec3 brightOrange = vec3(1.0, 0.45, 0.12); // ~1200K
+                        vec3 yellowHot = vec3(1.0, 0.78, 0.35);    // ~1500K
+                        vec3 whiteHot = vec3(1.0, 0.95, 0.88);     // ~2000K+
+
+                        // 5-stage color progression (starts at 5% / 200 kW/m²)
+                        vec3 thermalColor;
+                        if (heatLevel < 0.12) {
+                            // Dull red phase (5-12% heat / 200-480 kW/m²)
+                            float t = smoothstep(thermalStart, 0.12, heatLevel);
+                            thermalColor = mix(dullRed * 0.5, dullRed, t);
+                        } else if (heatLevel < 0.30) {
+                            // Dull red to cherry red (12-30% heat)
+                            float t = (heatLevel - 0.12) / 0.18;
+                            thermalColor = mix(dullRed, cherryRed, t);
+                        } else if (heatLevel < 0.50) {
+                            // Cherry red to bright orange (30-50% heat)
+                            float t = (heatLevel - 0.30) / 0.20;
+                            thermalColor = mix(cherryRed, brightOrange, t);
+                        } else if (heatLevel < 0.70) {
+                            // Bright orange to yellow-hot (50-70% heat)
+                            float t = (heatLevel - 0.50) / 0.20;
+                            thermalColor = mix(brightOrange, yellowHot, t);
+                        } else {
+                            // Yellow-hot to white-hot (70-100% heat)
+                            float t = (heatLevel - 0.70) / 0.30;
+                            thermalColor = mix(yellowHot, whiteHot, t);
+                        }
+
+                        // Intensity multiplier - gets VERY bright at peak
+                        float peakBoost = smoothstep(0.7, 1.0, heatLevel) * 4.0;
+                        float totalIntensity = intensityCurve * (1.0 + peakBoost);
+
+                        // =====================================================
+                        // CHAR MODULATION OF THERMAL GLOW (EXTREME AT PEAK)
+                        // =====================================================
+                        // Charred areas glow MUCH less intensely at peak heat
+                        // Ramp up dramatically above 70% heat
+                        float peakCharBoost = smoothstep(0.7, 1.0, heatLevel);
+                        float charDepth = 0.3 + peakCharBoost * 0.7;  // Goes from 0.3 to 1.0
+
+                        // Combine char patterns with STRONG contrast
+                        float charModulation = 1.0 - (combinedPattern * charDepth * 1.5);
+
+                        // Add very dark patches/streaks at peak heat
+                        float darkPatches = fbm(noiseCoord * 1.2 + 0.5);
+                        float darkStreaks = fbm(vec3(noiseCoord.x * 0.3, noiseCoord.y * 2.5, noiseCoord.z * 2.5));
+                        float combinedDark = max(darkPatches, darkStreaks) * peakCharBoost * 0.6;
+                        charModulation -= combinedDark;
+
+                        // Deep cracks glow much hotter - molten material visible
+                        float crackGlow = (1.0 - crackIntensity) * peakCharBoost * 0.5;
+                        charModulation += crackGlow;
+
+                        // EXTREME range at peak (0.1 to 1.4 - very high contrast)
+                        charModulation = clamp(charModulation, 0.1, 1.4);
+
+                        // Add subtle flickering at high temperatures
+                        float flicker = 1.0;
+                        if (heatLevel > 0.5) {
+                            flicker = 0.92 + noise(noiseCoord * 5.0 + time * 15.0) * 0.16;
+                        }
+
+                        // =====================================================
+                        // BASIC LIGHTING
+                        // =====================================================
+                        vec3 normal = normalize(vNormal);
+                        float diffuse = max(dot(normal, lightDir), 0.0);
+
+                        // Ambient + diffuse (fades as thermal glow dominates)
+                        float lightFade = 1.0 - smoothstep(0.3, 0.8, heatLevel);
+                        vec3 litColor = surfaceColor * (ambientLight + lightColor * diffuse * 0.6) * lightFade;
+
+                        // =====================================================
+                        // COMBINE: Surface + Ember Glow + Thermal Radiation
+                        // =====================================================
+                        // Start with lit surface
+                        vec3 finalColor = litColor;
+
+                        // Add subtle ember glow in cracks (only at moderate heat)
+                        float emberContrib = emberGlow * (1.0 - smoothstep(0.6, 0.9, heatLevel));
+                        finalColor += emberFinal * emberContrib * 1.5;
+
+                        // Add dominant thermal radiation glow (full brightness)
+                        finalColor += thermalColor * totalIntensity * flicker;
+
+                        // Bloom/oversaturation at extreme heat
+                        if (heatLevel > 0.8) {
+                            float bloom = (heatLevel - 0.8) / 0.2;
+                            finalColor += vec3(1.0, 0.98, 0.95) * bloom * bloom * 2.0;
+                        }
+
+                        // =====================================================
+                        // OVERLAY CHAR PATTERNS ON TOP (subtractive)
+                        // =====================================================
+                        // At peak heat, SUBTRACT dark char patterns from the bright glow
+                        float peakCharOverlay = smoothstep(0.5, 0.9, heatLevel);
+
+                        // Create visible dark char texture - STRONGER patterns
+                        float charOverlay = combinedPattern * 0.7 + darkPatches * 0.6;
+
+                        // Add larger scale dark splotches - MORE prominent
+                        float largeSplotches = fbm(noiseCoord * 0.6) * 0.6;
+                        charOverlay += largeSplotches;
+
+                        // Streaky ablation marks - STRONGER
+                        float ablationStreaks = fbm(vec3(noiseCoord.x * 0.15, noiseCoord.y * 4.0, noiseCoord.z * 4.0));
+                        charOverlay += ablationStreaks * 0.5;
+
+                        // Deep char cracks
+                        float deepCracks = (1.0 - crackIntensity) * 0.4;
+                        charOverlay += deepCracks;
+
+                        // Calculate how much to darken - MUCH stronger at peak
+                        float brightness = (finalColor.r + finalColor.g + finalColor.b) / 3.0;
+                        float darkenAmount = charOverlay * peakCharOverlay * min(brightness * 0.6, 1.2);
+
+                        // Extra darkening boost at very peak heat
+                        float peakBoostChar = smoothstep(0.85, 1.0, heatLevel) * 0.4;
+                        darkenAmount *= (1.0 + peakBoostChar);
+
+                        // Subtract darkness (char) from final color
+                        // Use warm dark tone so it looks like char, not just dimming
+                        vec3 charDarkening = vec3(darkenAmount * 1.0, darkenAmount * 0.9, darkenAmount * 0.75);
+                        finalColor -= charDarkening;
+
+                        // Ensure we don't go negative
+                        finalColor = max(finalColor, vec3(0.0));
+
+                        gl_FragColor = vec4(finalColor, 1.0);
+                    }
+                `,
+                lights: false
+            });
+        }
+
+        // Global time for heat shield shader
+        let heatShieldTime = 0;
+
+        // ================================================================
+        // TUMBLING MOTION SYSTEM
+        // ================================================================
+
+        function initTumbleState() {
+            phaseTimer = 0;
+            phaseDuration = getRestDuration();
+            isResting = true;
+            oscillationTime = 0;
+            oscillationAmplitudeScale = 1.0;
+            targetOscAmplitude = 1.0;
+            tumbleAngularVelocity = 0;
+            tumbleTargetVelocity = 0;
+            randomizeOscillation();
+            pickNewTumbleTarget();
+            if (currentVehicle) {
+                tumbleCurrentQuat.copy(currentVehicle.quaternion);
+            }
+        }
+
+        function randomizeOscillation() {
+            // Random frequencies for each axis (different so motion isn't circular)
+            oscillationFreqX = 0.25 + Math.random() * 0.5;
+            oscillationFreqY = 0.2 + Math.random() * 0.4;
+            oscillationFreqZ = 0.22 + Math.random() * 0.45;
+
+            // Random amplitudes (small wobble, 3-10 degrees)
+            oscillationAmpX = (3 + Math.random() * 7) * Math.PI / 180;
+            oscillationAmpY = (3 + Math.random() * 7) * Math.PI / 180;
+            oscillationAmpZ = (3 + Math.random() * 7) * Math.PI / 180;
+
+            // Random phases
+            oscillationPhaseX = Math.random() * Math.PI * 2;
+            oscillationPhaseY = Math.random() * Math.PI * 2;
+            oscillationPhaseZ = Math.random() * Math.PI * 2;
+        }
+
+        function getRestDuration() {
+            // Rest/oscillate for 2-6 seconds
+            return 2.0 + Math.random() * 4.0;
+        }
+
+        function getMoveDuration() {
+            // Move for 3-8 seconds before next rest
+            return 3.0 + Math.random() * 5.0;
+        }
+
+        function getRotationSpeed() {
+            // Mostly slow, occasionally faster
+            if (Math.random() < 0.12) {
+                return 0.3 + Math.random() * 0.4;  // Faster (rad/sec)
+            } else {
+                return 0.08 + Math.random() * 0.15;  // Slow drift (rad/sec)
+            }
+        }
+
+        function pickNewTumbleTarget() {
+            // Random rotation axis
+            tumbleAxis.set(
+                Math.random() - 0.5,
+                Math.random() - 0.5,
+                Math.random() - 0.5
+            ).normalize();
+
+            tumbleTargetVelocity = getRotationSpeed();
+        }
+
+        function applyOscillation(baseQuat, amplitudeScale = 1.0) {
+            const wobbleX = Math.sin(oscillationTime * oscillationFreqX * Math.PI * 2 + oscillationPhaseX) * oscillationAmpX * amplitudeScale;
+            const wobbleY = Math.sin(oscillationTime * oscillationFreqY * Math.PI * 2 + oscillationPhaseY) * oscillationAmpY * amplitudeScale;
+            const wobbleZ = Math.sin(oscillationTime * oscillationFreqZ * Math.PI * 2 + oscillationPhaseZ) * oscillationAmpZ * amplitudeScale;
+
+            const wobbleQuat = new THREE.Quaternion();
+            const euler = new THREE.Euler(wobbleX, wobbleY, wobbleZ, 'XYZ');
+            wobbleQuat.setFromEuler(euler);
+
+            const result = new THREE.Quaternion();
+            result.copy(baseQuat);
+            result.multiply(wobbleQuat);
+            return result;
+        }
+
+        function updateTumble(dt) {
+            if (!currentVehicleConfig || !currentVehicleConfig.isTumbling || !currentVehicle) return;
+
+            phaseTimer += dt;
+            oscillationTime += dt;
+
+            // Smoothly blend oscillation amplitude toward target
+            const ampBlendRate = 0.8;  // How fast amplitude changes
+            oscillationAmplitudeScale += (targetOscAmplitude - oscillationAmplitudeScale) * ampBlendRate * dt;
+
+            // Smoothly blend angular velocity toward target
+            const velBlendRate = 1.2;  // How fast velocity changes
+            tumbleAngularVelocity += (tumbleTargetVelocity - tumbleAngularVelocity) * velBlendRate * dt;
+
+            // Check for phase transitions
+            if (phaseTimer >= phaseDuration) {
+                phaseTimer = 0;
+                isResting = !isResting;
+
+                if (isResting) {
+                    // Entering rest phase - slow down and oscillate more
+                    phaseDuration = getRestDuration();
+                    tumbleTargetVelocity = 0;
+                    targetOscAmplitude = 1.0;
+                    // Slight randomization of oscillation
+                    if (Math.random() < 0.5) {
+                        randomizeOscillation();
+                    }
+                } else {
+                    // Entering move phase - speed up and reduce oscillation
+                    phaseDuration = getMoveDuration();
+                    pickNewTumbleTarget();
+                    targetOscAmplitude = 0.15;  // Keep small oscillation during movement
+                }
+            }
+
+            // Apply continuous rotation based on current angular velocity
+            if (tumbleAngularVelocity > 0.001) {
+                const deltaAngle = tumbleAngularVelocity * dt;
+                const deltaQuat = new THREE.Quaternion();
+                deltaQuat.setFromAxisAngle(tumbleAxis, deltaAngle);
+                tumbleCurrentQuat.multiply(deltaQuat);
+                tumbleCurrentQuat.normalize();
+            }
+
+            // Apply oscillation on top of current orientation
+            const finalQuat = applyOscillation(tumbleCurrentQuat, oscillationAmplitudeScale);
+            currentVehicle.quaternion.copy(finalQuat);
+        }
+
+        function easeInOutCubic(t) {
+            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+
+        // ================================================================
+        // DYNAMIC WINDWARD HEATING SYSTEM (for School Bus)
+        // ================================================================
+        // Heats all surfaces based on their angle to velocity vector
+        // with gradient from stagnation point
+
+        function createDynamicHeatMaterial() {
+            return new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    heatFlux: { value: 0 },
+                    maxHeatFlux: { value: 4000.0 },
+                    velocityDir: { value: new THREE.Vector3(1, 0, 0) },
+                    baseColor: { value: new THREE.Color(0xccaa00) },  // School bus yellow
+                    charColor: { value: new THREE.Color(0x1a1a1a) },
+                    ambientLight: { value: new THREE.Color(0x404040) },
+                    lightDir: { value: new THREE.Vector3(1, 1, 1).normalize() },
+                    lightColor: { value: new THREE.Color(0xffffff) }
+                },
+                vertexShader: `
+                    varying vec3 vNormal;
+                    varying vec3 vWorldPosition;
+                    varying vec3 vWorldNormal;
+                    varying vec2 vUv;
+
+                    void main() {
+                        vNormal = normalize(normalMatrix * normal);
+                        vUv = uv;
+
+                        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                        vWorldPosition = worldPos.xyz;
+                        vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform float heatFlux;
+                    uniform float maxHeatFlux;
+                    uniform vec3 velocityDir;
+                    uniform vec3 baseColor;
+                    uniform vec3 charColor;
+                    uniform vec3 ambientLight;
+                    uniform vec3 lightDir;
+                    uniform vec3 lightColor;
+
+                    varying vec3 vNormal;
+                    varying vec3 vWorldPosition;
+                    varying vec3 vWorldNormal;
+                    varying vec2 vUv;
+
+                    // Noise functions
+                    float hash(vec3 p) {
+                        p = fract(p * 0.3183099 + 0.1);
+                        p *= 17.0;
+                        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+                    }
+
+                    float noise(vec3 p) {
+                        vec3 i = floor(p);
+                        vec3 f = fract(p);
+                        f = f * f * (3.0 - 2.0 * f);
+                        return mix(
+                            mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
+                                mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                            mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                                mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+                    }
+
+                    float fbm(vec3 p) {
+                        float value = 0.0;
+                        float amplitude = 0.5;
+                        for (int i = 0; i < 4; i++) {
+                            value += amplitude * noise(p);
+                            p *= 2.0;
+                            amplitude *= 0.5;
+                        }
+                        return value;
+                    }
+
+                    void main() {
+                        float heatLevel = clamp(heatFlux / maxHeatFlux, 0.0, 1.0);
+
+                        // Calculate windward factor: how much this surface faces velocity
+                        // dot product of normal with velocity direction
+                        // +1 = directly facing flow (stagnation point)
+                        // 0 = perpendicular
+                        // -1 = facing away (leeward, no heating)
+                        float windwardDot = dot(vWorldNormal, velocityDir);
+                        float windwardFactor = clamp(windwardDot, 0.0, 1.0);
+
+                        // Stagnation point heating - exponential falloff from direct impact
+                        // Surfaces directly facing flow get most heat
+                        float stagnationFactor = pow(windwardFactor, 1.5);
+
+                        // Effective heat level for this surface
+                        float surfaceHeat = heatLevel * stagnationFactor;
+
+                        // Thermal color progression
+                        vec3 dullRed = vec3(0.5, 0.08, 0.03);
+                        vec3 cherryRed = vec3(0.85, 0.18, 0.06);
+                        vec3 brightOrange = vec3(1.0, 0.45, 0.12);
+                        vec3 yellowHot = vec3(1.0, 0.78, 0.35);
+                        vec3 whiteHot = vec3(1.0, 0.95, 0.88);
+
+                        vec3 thermalColor;
+                        float thermalStart = 0.05;
+
+                        if (surfaceHeat < 0.12) {
+                            float t = smoothstep(thermalStart, 0.12, surfaceHeat);
+                            thermalColor = mix(dullRed * 0.5, dullRed, t);
+                        } else if (surfaceHeat < 0.30) {
+                            float t = (surfaceHeat - 0.12) / 0.18;
+                            thermalColor = mix(dullRed, cherryRed, t);
+                        } else if (surfaceHeat < 0.50) {
+                            float t = (surfaceHeat - 0.30) / 0.20;
+                            thermalColor = mix(cherryRed, brightOrange, t);
+                        } else if (surfaceHeat < 0.70) {
+                            float t = (surfaceHeat - 0.50) / 0.20;
+                            thermalColor = mix(brightOrange, yellowHot, t);
+                        } else {
+                            float t = (surfaceHeat - 0.70) / 0.30;
+                            thermalColor = mix(yellowHot, whiteHot, t);
+                        }
+
+                        // Intensity calculation
+                        float thermalIntensity = smoothstep(thermalStart, 1.0, surfaceHeat);
+                        float earlyGlow = sqrt(thermalIntensity) * 1.5;
+                        float peakGlow = pow(thermalIntensity, 2.0) * 4.0;
+                        float totalIntensity = earlyGlow + peakGlow;
+
+                        // Charring effect on heated surfaces
+                        vec3 noiseCoord = vWorldPosition * 0.1;
+                        float charPattern = fbm(noiseCoord * 2.0);
+                        float charAmount = surfaceHeat * 0.5 * charPattern;
+                        charAmount = clamp(charAmount, 0.0, 0.6);
+
+                        // Base surface color with charring
+                        vec3 surfaceColor = mix(baseColor, charColor, charAmount);
+
+                        // Basic lighting
+                        vec3 normal = normalize(vNormal);
+                        float diffuse = max(dot(normal, lightDir), 0.0);
+                        float lightFade = 1.0 - smoothstep(0.2, 0.7, surfaceHeat);
+                        vec3 litColor = surfaceColor * (ambientLight + lightColor * diffuse * 0.6) * lightFade;
+
+                        // Add thermal glow
+                        vec3 finalColor = litColor;
+                        if (surfaceHeat > thermalStart) {
+                            // Flickering
+                            float flicker = 0.92 + noise(noiseCoord * 5.0 + time * 15.0) * 0.16;
+                            finalColor += thermalColor * totalIntensity * flicker;
+
+                            // Bloom at high heat
+                            if (surfaceHeat > 0.7) {
+                                float bloom = (surfaceHeat - 0.7) / 0.3;
+                                finalColor += vec3(1.0, 0.98, 0.95) * bloom * bloom * 1.5;
+                            }
+                        }
+
+                        gl_FragColor = vec4(finalColor, 1.0);
+                    }
+                `,
+                lights: false
+            });
+        }
+
+        function setupDynamicHeating() {
+            if (!currentVehicle || !currentVehicleConfig || !currentVehicleConfig.dynamicHeatShield) return;
+
+            allVehicleMeshes = [];
+            dynamicHeatMaterials.clear();
+
+            // Find all meshes in the vehicle
+            currentVehicle.traverse((child) => {
+                if (child.isMesh && child.geometry) {
+                    allVehicleMeshes.push(child);
+
+                    // Store original material
+                    if (!originalMaterials.has(child)) {
+                        originalMaterials.set(child, child.material.clone());
+                    }
+
+                    // Create dynamic heat material for this mesh
+                    const heatMat = createDynamicHeatMaterial();
+
+                    // Try to preserve original base color
+                    const origMat = originalMaterials.get(child);
+                    if (origMat && origMat.color) {
+                        heatMat.uniforms.baseColor.value.copy(origMat.color);
+                    }
+
+                    dynamicHeatMaterials.set(child, heatMat);
+                    child.material = heatMat;
+                }
+            });
+
+            // For dynamic heat shields, use all meshes as "heat shield" for bow shock generation
+            heatShieldMeshes = allVehicleMeshes;
+        }
+
+        function updateDynamicHeating(flux, dt) {
+            if (!currentVehicleConfig || !currentVehicleConfig.dynamicHeatShield) return;
+
+            const velocityDir = new THREE.Vector3(1, 0, 0);  // Velocity is +X
+
+            allVehicleMeshes.forEach(mesh => {
+                const material = dynamicHeatMaterials.get(mesh);
+                if (material && material.uniforms) {
+                    material.uniforms.time.value = heatShieldTime;
+                    material.uniforms.heatFlux.value = flux;
+                    material.uniforms.velocityDir.value.copy(velocityDir);
+                }
+            });
+
+            // Cache windward vertices for particle spawning (update every frame due to tumbling)
+            updateCachedWindwardVertices();
+
+            // Update cached heat shield color based on heat flux (for particle spawning)
+            const heatLevel = Math.min(flux / PEAK_HEAT_FLUX, 1.0);
+            if (heatLevel < 0.3) {
+                cachedHeatShieldColor.setRGB(0.5 * heatLevel / 0.3, 0.08 * heatLevel / 0.3, 0.03 * heatLevel / 0.3);
+            } else if (heatLevel < 0.6) {
+                const t = (heatLevel - 0.3) / 0.3;
+                cachedHeatShieldColor.setRGB(0.5 + 0.5 * t, 0.08 + 0.37 * t, 0.03 + 0.09 * t);
+            } else {
+                const t = (heatLevel - 0.6) / 0.4;
+                cachedHeatShieldColor.setRGB(1.0, 0.45 + 0.5 * t, 0.12 + 0.76 * t);
+            }
+        }
+
+        function updateCachedWindwardVertices() {
+            cachedWindwardVertices = [];
+            if (allVehicleMeshes.length === 0) return;
+
+            const velocityDir = new THREE.Vector3(1, 0, 0);
+            const tempNormal = new THREE.Vector3();
+            const tempVertex = new THREE.Vector3();
+
+            allVehicleMeshes.forEach(mesh => {
+                if (!mesh.geometry) return;
+
+                const posAttr = mesh.geometry.attributes.position;
+                const normAttr = mesh.geometry.attributes.normal;
+                if (!posAttr || !normAttr) return;
+
+                mesh.updateMatrixWorld();
+                const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
+
+                // Sample every Nth vertex for performance
+                const step = Math.max(1, Math.floor(posAttr.count / 200));
+
+                for (let i = 0; i < posAttr.count; i += step) {
+                    tempVertex.fromBufferAttribute(posAttr, i);
+                    tempNormal.fromBufferAttribute(normAttr, i);
+
+                    // Transform to world space
+                    tempVertex.applyMatrix4(mesh.matrixWorld);
+                    tempNormal.applyMatrix3(normalMatrix).normalize();
+
+                    // Check if facing velocity (windward)
+                    const dot = tempNormal.dot(velocityDir);
+                    if (dot > 0.2) {  // Facing into flow
+                        cachedWindwardVertices.push({
+                            position: tempVertex.clone(),
+                            normal: tempNormal.clone(),
+                            windwardFactor: dot
+                        });
+                    }
+                }
+            });
+        }
+
+        function getWindwardVertices() {
+            // For dynamic heating vehicles, find vertices facing the velocity
+            if (!currentVehicle || allVehicleMeshes.length === 0) return [];
+
+            const velocityDir = new THREE.Vector3(1, 0, 0);
+            const windwardVerts = [];
+            const tempNormal = new THREE.Vector3();
+            const tempVertex = new THREE.Vector3();
+
+            allVehicleMeshes.forEach(mesh => {
+                if (!mesh.geometry) return;
+
+                const posAttr = mesh.geometry.attributes.position;
+                const normAttr = mesh.geometry.attributes.normal;
+                if (!posAttr || !normAttr) return;
+
+                mesh.updateMatrixWorld();
+
+                for (let i = 0; i < posAttr.count; i++) {
+                    tempVertex.fromBufferAttribute(posAttr, i);
+                    tempNormal.fromBufferAttribute(normAttr, i);
+
+                    // Transform to world space
+                    tempVertex.applyMatrix4(mesh.matrixWorld);
+                    tempNormal.transformDirection(mesh.matrixWorld);
+
+                    // Check if facing velocity (windward)
+                    const dot = tempNormal.dot(velocityDir);
+                    if (dot > 0.1) {  // Facing into flow
+                        windwardVerts.push({
+                            position: tempVertex.clone(),
+                            normal: tempNormal.clone(),
+                            windwardFactor: dot
+                        });
+                    }
+                }
+            });
+
+            return windwardVerts;
+        }
+
+        // Update heat shield appearance and cache color for particle spawning
+        function updateHeatShield(flux, dt) {
+            // Update shader time
+            if (dt) heatShieldTime += dt;
+
+            const color = getHeatColor(flux);
+            const intensity = flux < 200 ? 0 : Math.pow(flux / PEAK_HEAT_FLUX, 1.2) * 3;
+
+            heatShieldMeshes.forEach(mesh => {
+                // Update shader uniforms if using custom shader
+                if (mesh.material.uniforms) {
+                    mesh.material.uniforms.time.value = heatShieldTime;
+                    mesh.material.uniforms.heatFlux.value = flux;
+                }
+                // Fallback for standard materials
+                else if (mesh.material.emissive) {
+                    mesh.material.emissive.copy(color);
+                    mesh.material.emissiveIntensity = intensity;
+
+                    if (flux > 1500) {
+                        mesh.material.emissiveIntensity *= 1 + (Math.random() - 0.5) * 0.15;
+                    }
+                }
+            });
+
+            // Cache the heat shield color for particle emission
+            // This samples the visual appearance of the heat shield material
+            cachedHeatShieldColor.copy(color);
+
+            // Update heat glow light
+            heatLight.color.copy(color);
+            heatLight.intensity = intensity * 0.5;
+
+            // Update UI indicator
+            updateHeatIndicator(flux);
+        }
+
+        function updateHeatIndicator(flux) {
+            const indicator = document.getElementById('heatIndicator');
+            const color = getHeatColor(flux);
+
+            let status, bgColor;
+            if (flux < 200) {
+                status = 'Cold - No heating';
+                bgColor = '#1a1a1a';
+            } else if (flux < 800) {
+                status = 'Light heating';
+                bgColor = '#3a1a1a';
+            } else if (flux < 1500) {
+                status = 'Moderate heating';
+                bgColor = '#4a2a00';
+            } else if (flux < 2500) {
+                status = 'High heating';
+                bgColor = '#6a3a00';
+            } else if (flux < 3500) {
+                status = 'Severe heating';
+                bgColor = '#8a4a00';
+            } else {
+                status = 'EXTREME HEATING';
+                bgColor = '#aa5500';
+            }
+
+            indicator.textContent = status;
+            indicator.style.background = bgColor;
+            indicator.style.borderColor = `rgb(${Math.floor(color.r * 255)}, ${Math.floor(color.g * 255)}, ${Math.floor(color.b * 255)})`;
+        }
+
+        // ========================================
+        // HYPERSONIC WAKE PARTICLE SYSTEM
+        // Implements physically believable wake trail behavior
+        // ========================================
+
+        /**
+         * Particle class for hypersonic wake simulation
+         *
+         * Key behaviors:
+         * - Spawns with exact heat shield color (sampled from material)
+         * - Lifetime-based color transition to neutral grey
+         * - Exponential velocity decay (downstream lag effect)
+         * - Non-emissive smoke appearance (no glowing orbs)
+         */
+        class Particle {
+            constructor() {
+                // Position and motion state
+                this.position = new THREE.Vector3();
+                this.velocity = new THREE.Vector3();
+                this.initialVelocity = new THREE.Vector3(); // Stored for decay calculations
+                this.initialSpeed = 0; // For percentage-based velocity tracking
+
+                // Lifetime tracking
+                this.age = 0;
+                this.maxAge = 0;
+
+                // Visual properties
+                this.color = new THREE.Color();
+                this.spawnColor = new THREE.Color(); // Exact heat shield color at spawn
+                this.baseSize = 0; // Initial size for growth calculations
+                this.currentSize = 0;
+                this.alpha = 0;
+                this.brightness = 1.0; // Emissive brightness multiplier
+                this.stretch = 1.0; // Velocity-aligned stretch factor
+
+                // State
+                this.active = false;
+
+                // Turbulence accumulator for smooth noise
+                this.turbulenceOffset = new THREE.Vector3();
+                this.noisePhase = 0; // For procedural noise
+            }
+
+            /**
+             * Reset particle for reuse from object pool
+             * @param {THREE.Vector3} position - Spawn position (world space)
+             * @param {THREE.Vector3} velocity - Initial velocity (matches vehicle velocity direction)
+             * @param {number} maxAge - Particle lifetime in seconds
+             * @param {THREE.Color} heatShieldColor - Sampled from heat shield material
+             * @param {number} baseSize - Initial particle size
+             */
+            reset(position, velocity, maxAge, heatShieldColor, baseSize) {
+                this.position.copy(position);
+                this.velocity.copy(velocity);
+                this.initialVelocity.copy(velocity);
+                this.initialSpeed = velocity.length();
+
+                this.age = 0;
+                this.maxAge = maxAge;
+
+                // SPAWN COLOR: Exact match to heat shield material color
+                this.color.copy(heatShieldColor);
+                this.spawnColor.copy(heatShieldColor);
+
+                this.baseSize = baseSize;
+                this.currentSize = baseSize;
+                this.alpha = 0; // Starts at 0 for fade-in
+                this.brightness = 6.0; // Maximum intensity at spawn - plasma formation
+                this.stretch = 2.5; // Initial velocity-aligned stretch
+
+                this.active = true;
+                this.turbulenceOffset.set(0, 0, 0);
+                this.noisePhase = Math.random() * 100; // Random phase for varied turbulence
+            }
+
+            /**
+             * Update particle state for current frame
+             * Implements 4-stage plasma wake model:
+             * - Stage A (0-15%): Plasma formation - max brightness
+             * - Stage B (15-45%): Cooling plasma - reducing emissive
+             * - Stage C (45-75%): Early smoke - no emissive
+             * - Stage D (75-100%): Dissipating wake - opacity fade
+             *
+             * @param {number} dt - Delta time in seconds
+             */
+            update(dt) {
+                this.age += dt;
+
+                // Check lifetime expiration
+                if (this.age >= this.maxAge) {
+                    this.active = false;
+                    return;
+                }
+
+                // Normalized lifetime (0.0 to 1.0)
+                const t = this.age / this.maxAge;
+
+                // ========================================
+                // VELOCITY DECAY (Hypersonic Wake Lag)
+                // ========================================
+                const decayRate = 1.8;
+                const velocityFactor = Math.exp(-decayRate * t);
+                this.velocity.copy(this.initialVelocity).multiplyScalar(velocityFactor);
+
+                // ========================================
+                // TURBULENCE (Billowing Smoke Diffusion)
+                // ========================================
+                // Increased lateral diffusion over time for smoke billowing
+                this.noisePhase += dt * 2.5;
+
+                // Amplitude increases significantly as soot cools and diffuses
+                const noiseAmplitude = smoothstep(0.2, 0.9, t) * 3.0;
+
+                // Multi-frequency noise for natural billowing motion
+                const noiseY = (Math.sin(this.noisePhase * 1.3) + Math.sin(this.noisePhase * 2.7) * 0.3) * noiseAmplitude * dt;
+                const noiseZ = (Math.cos(this.noisePhase * 0.9) + Math.cos(this.noisePhase * 2.1) * 0.3) * noiseAmplitude * dt;
+
+                this.turbulenceOffset.set(0, noiseY, noiseZ);
+                this.position.add(this.turbulenceOffset);
+
+                // Update position
+                this.position.addScaledVector(this.velocity, dt);
+
+                // ========================================
+                // BRIGHTNESS (Soot Layer - Moderate, Not Glowing)
+                // ========================================
+                // Soot starts moderate brightness, fades to dim
+                if (t < 0.10) {
+                    // Initial moderate brightness
+                    this.brightness = 2.5;
+                } else if (t < 0.40) {
+                    // Gradual reduction
+                    const stageT = (t - 0.10) / 0.30;
+                    this.brightness = 2.5 - stageT * 1.0; // 2.5 → 1.5
+                } else if (t < 0.70) {
+                    // Low brightness smoke
+                    const stageT = (t - 0.40) / 0.30;
+                    this.brightness = 1.5 - stageT * 0.5; // 1.5 → 1.0
+                } else {
+                    // Dim dissipating smoke
+                    this.brightness = 1.0;
+                }
+
+                // ========================================
+                // COLOR INTERPOLATION (Soot Layer Gradient)
+                // ========================================
+                // Heat Shield → Burnt Orange → Brown → Grey → Dark Grey
+                // This is the SOOT layer - cooler colors than plasma
+
+                if (t < 0.15) {
+                    // Initial heat shield color
+                    this.color.copy(this.spawnColor);
+                } else if (t < 0.30) {
+                    // Heat shield → Burnt orange
+                    const blendT = (t - 0.15) / 0.15;
+                    this.color.copy(this.spawnColor).lerp(SOOT_BURNT_ORANGE, blendT);
+                } else if (t < 0.50) {
+                    // Burnt orange → Brown
+                    const blendT = (t - 0.30) / 0.20;
+                    this.color.copy(SOOT_BURNT_ORANGE).lerp(SOOT_BROWN, blendT);
+                } else if (t < 0.70) {
+                    // Brown → Neutral grey
+                    const blendT = (t - 0.50) / 0.20;
+                    this.color.copy(SOOT_BROWN).lerp(SMOKE_GREY, blendT);
+                } else {
+                    // Grey → Dark grey fade
+                    const blendT = (t - 0.70) / 0.30;
+                    this.color.copy(SMOKE_GREY).lerp(SOOT_DARK_GREY, blendT);
+                }
+
+                // ========================================
+                // OPACITY CURVE
+                // ========================================
+                // 0-10%: Rapid fade in
+                // 10-60%: High opacity
+                // 60-100%: Exponential fade out
+
+                if (t < 0.10) {
+                    // Rapid fade in
+                    this.alpha = (t / 0.10) * 0.95;
+                } else if (t < 0.60) {
+                    // Maintain high opacity
+                    this.alpha = 0.95;
+                } else {
+                    // Exponential fade out
+                    const fadeT = (t - 0.60) / 0.40;
+                    this.alpha = 0.95 * Math.exp(-3.0 * fadeT);
+                }
+
+                // ========================================
+                // SPRITE STRETCH (Velocity-Aligned)
+                // ========================================
+                // Elongated during early lifetime, reduces over time
+                if (t < 0.15) {
+                    // Maximum stretch during plasma formation
+                    this.stretch = 2.5;
+                } else if (t < 0.45) {
+                    // Gradual reduction during cooling
+                    const stretchT = (t - 0.15) / 0.30;
+                    this.stretch = 2.5 - stretchT * 1.0; // 2.5 → 1.5
+                } else {
+                    // Minimal stretch for smoke phase
+                    const stretchT = (t - 0.45) / 0.55;
+                    this.stretch = 1.5 - stretchT * 0.5; // 1.5 → 1.0
+                }
+
+                // ========================================
+                // SIZE GROWTH (Billowing Smoke Expansion)
+                // ========================================
+                // Soot grows 2-4x over lifetime for billowing effect
+
+                if (t < 0.30) {
+                    // Initial moderate expansion
+                    this.currentSize = this.baseSize * (1.0 + t * 2.0);
+                } else if (t < 0.60) {
+                    // Accelerating expansion
+                    const expandT = (t - 0.30) / 0.30;
+                    this.currentSize = this.baseSize * (1.6 + expandT * 1.5);
+                } else {
+                    // Full billowing smoke
+                    const expandT = (t - 0.60) / 0.40;
+                    this.currentSize = this.baseSize * (3.1 + expandT * 1.5);
+                }
+
+                // ========================================
+                // CLEANUP CHECK
+                // ========================================
+                if (this.alpha < 0.01) {
+                    this.active = false;
+                }
+            }
+        }
+
+        /**
+         * Particle emitter for hypersonic wake trail
+         *
+         * Features:
+         * - Object pooling for GPU efficiency
+         * - Samples heat shield color at emission time
+         * - Non-emissive smoke shader (no bloom/glow)
+         * - Soft volumetric smoke sprite texture
+         */
+        class ParticleEmitter {
+            constructor(maxParticles = 5000) {
+                this.maxParticles = maxParticles;
+                this.particles = [];
+                this.accumulator = 0;
+
+                // Pre-allocate particle pool (no runtime allocations)
+                for (let i = 0; i < maxParticles; i++) {
+                    this.particles.push(new Particle());
+                }
+
+                this.createGeometry();
+            }
+
+            /**
+             * Create GPU buffers and shader material
+             * Supports brightness-modulated colors and velocity-aligned stretching
+             */
+            createGeometry() {
+                const geometry = new THREE.BufferGeometry();
+
+                // Pre-allocate typed arrays for GPU buffers
+                const positions = new Float32Array(this.maxParticles * 3);
+                const colors = new Float32Array(this.maxParticles * 3);
+                const sizes = new Float32Array(this.maxParticles);
+                const alphas = new Float32Array(this.maxParticles);
+                const stretches = new Float32Array(this.maxParticles);
+
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+                geometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
+                geometry.setAttribute('stretch', new THREE.BufferAttribute(stretches, 1));
+
+                // Plasma wake shader with brightness and stretch support
+                const material = new THREE.ShaderMaterial({
+                    uniforms: {
+                        pointTexture: { value: this.createSmokeTexture() }
+                    },
+                    vertexShader: `
+                        attribute float size;
+                        attribute float alpha;
+                        attribute float stretch;
+                        attribute vec3 color;
+
+                        varying vec3 vColor;
+                        varying float vAlpha;
+                        varying float vStretch;
+
+                        void main() {
+                            vColor = color;
+                            vAlpha = alpha;
+                            vStretch = stretch;
+
+                            vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+
+                            // Size with stretch factor applied
+                            gl_PointSize = size * stretch * (280.0 / -mvPosition.z);
+                            gl_Position = projectionMatrix * mvPosition;
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform sampler2D pointTexture;
+
+                        varying vec3 vColor;
+                        varying float vAlpha;
+                        varying float vStretch;
+
+                        void main() {
+                            // Stretch UV coordinates for elongated appearance
+                            vec2 uv = gl_PointCoord;
+
+                            // Elongate along X axis (flow direction in screen space)
+                            uv.x = (uv.x - 0.5) / max(vStretch * 0.5, 0.5) + 0.5;
+
+                            // Clamp to valid range
+                            if (uv.x < 0.0 || uv.x > 1.0) discard;
+
+                            vec4 tex = texture2D(pointTexture, uv);
+
+                            // Output with color (already brightness-modulated)
+                            gl_FragColor = vec4(vColor, vAlpha * tex.a);
+                        }
+                    `,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    depthTest: true
+                });
+
+                this.mesh = new THREE.Points(geometry, material);
+                scene.add(this.mesh);
+            }
+
+            /**
+             * Create plasma/smoke sprite texture
+             * Bright core for plasma phase, soft falloff for smoke phase
+             */
+            createSmokeTexture() {
+                const canvas = document.createElement('canvas');
+                const size = 128;
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+
+                const center = size / 2;
+                const gradient = ctx.createRadialGradient(center, center, 0, center, center, center);
+
+                // Bright core, gradual falloff for plasma/smoke hybrid appearance
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');    // Bright core
+                gradient.addColorStop(0.15, 'rgba(255, 255, 255, 0.9)'); // Still bright
+                gradient.addColorStop(0.35, 'rgba(255, 255, 255, 0.5)'); // Transition
+                gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.2)');  // Soft edge
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');      // Fade out
+
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, size, size);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.needsUpdate = true;
+                return texture;
+            }
+
+            /**
+             * Emit a single particle from heat shield vertex
+             * @param {number} flux - Current heat flux value
+             */
+            emit(flux) {
+                // Check if we have spawn points (regular heat shield or dynamic windward)
+                const hasDynamicHeating = currentVehicleConfig && currentVehicleConfig.dynamicHeatShield;
+                const hasSpawnPoints = heatShieldVertices.length > 0 ||
+                    (hasDynamicHeating && cachedWindwardVertices.length > 0);
+
+                if (flux < SPAWN_HEAT_THRESHOLD || !hasSpawnPoints) return;
+
+                // Find inactive particle from pool (no allocation)
+                let particle = null;
+                for (let i = 0; i < this.maxParticles; i++) {
+                    if (!this.particles[i].active) {
+                        particle = this.particles[i];
+                        break;
+                    }
+                }
+                if (!particle) return; // Pool exhausted
+
+                // Pick random vertex from heat shield mesh or windward vertices
+                let spawnPos;
+                if (hasDynamicHeating && cachedWindwardVertices.length > 0) {
+                    // Use cached windward vertices for dynamic heating
+                    const windwardVert = cachedWindwardVertices[
+                        Math.floor(Math.random() * cachedWindwardVertices.length)
+                    ];
+                    spawnPos = windwardVert.position.clone();
+                } else {
+                    // Use regular heat shield vertices
+                    const vertexLocal = heatShieldVertices[
+                        Math.floor(Math.random() * heatShieldVertices.length)
+                    ].clone();
+                    // Transform to world space using heat shield mesh matrix
+                    if (heatShieldMeshes.length > 0) {
+                        vertexLocal.applyMatrix4(heatShieldMeshes[0].matrixWorld);
+                    }
+                    spawnPos = vertexLocal;
+                }
+
+                // Minimal offset - keep particles tight to heat shield surface
+                spawnPos.x += (Math.random() - 0.5) * 0.1;
+                spawnPos.y += (Math.random() - 0.5) * 0.1;
+                spawnPos.z += (Math.random() - 0.5) * 0.1;
+
+                // VELOCITY: Straight back from heat shield - coherent plasma stream
+                // Minimal lateral spread for tight, directional trail
+                const baseSpeed = 25 + Math.random() * 10;
+                const velocity = new THREE.Vector3(
+                    -baseSpeed,  // Straight back from heat shield
+                    (Math.random() - 0.5) * 0.5,  // Minimal Y spread
+                    (Math.random() - 0.5) * 0.5   // Minimal Z spread
+                );
+
+                // SPAWN COLOR: Sample directly from cached heat shield material color
+                // This ensures exact match to vehicle heat shield appearance
+                const spawnColor = cachedHeatShieldColor.clone();
+
+                // Size varies with heat flux (more heat = larger particles)
+                const heatNorm = flux / PEAK_HEAT_FLUX;
+                const baseSize = 0.5 + Math.random() * 0.3 + heatNorm * 0.3;
+
+                // Lifetime varies for natural trail appearance
+                // Longer lifetime allows particles to travel much farther
+                const maxAge = (4 + Math.random() * 3) * trailLengthMultiplier;
+
+                particle.reset(spawnPos, velocity, maxAge, spawnColor, baseSize);
+            }
+
+            /**
+             * Update emitter and all particles
+             * @param {number} dt - Delta time in seconds
+             * @param {number} flux - Current heat flux value
+             * @returns {number} Active particle count
+             */
+            update(dt, flux) {
+                // Calculate spawn rate based on heat flux
+                // Higher spawn rate for denser, more intense trail
+                let spawnRate = 0;
+                if (flux >= SPAWN_HEAT_THRESHOLD) {
+                    const normalized = (flux - SPAWN_HEAT_THRESHOLD) / (PEAK_HEAT_FLUX - SPAWN_HEAT_THRESHOLD);
+                    spawnRate = 150 + normalized * 450; // 150-600 particles per second
+                }
+
+                // Accumulate and emit particles
+                this.accumulator += spawnRate * dt;
+                while (this.accumulator >= 1) {
+                    this.emit(flux);
+                    this.accumulator -= 1;
+                }
+
+                // Update all active particles
+                let activeCount = 0;
+                for (let i = 0; i < this.maxParticles; i++) {
+                    if (this.particles[i].active) {
+                        this.particles[i].update(dt);
+                        activeCount++;
+                    }
+                }
+
+                // Update GPU buffers
+                this.updateBuffers();
+                return activeCount;
+            }
+
+            /**
+             * Update GPU buffers with current particle state
+             * Includes position, color (brightness-modulated), size, alpha, and stretch
+             */
+            updateBuffers() {
+                const geo = this.mesh.geometry;
+                const positions = geo.attributes.position.array;
+                const colors = geo.attributes.color.array;
+                const sizes = geo.attributes.size.array;
+                const alphas = geo.attributes.alpha.array;
+                const stretches = geo.attributes.stretch.array;
+
+                let idx = 0;
+                for (let i = 0; i < this.maxParticles; i++) {
+                    const p = this.particles[i];
+                    if (p.active) {
+                        // Position
+                        positions[idx * 3] = p.position.x;
+                        positions[idx * 3 + 1] = p.position.y;
+                        positions[idx * 3 + 2] = p.position.z;
+
+                        // Color with brightness multiplier (pre-multiplied for shader)
+                        colors[idx * 3] = p.color.r * p.brightness;
+                        colors[idx * 3 + 1] = p.color.g * p.brightness;
+                        colors[idx * 3 + 2] = p.color.b * p.brightness;
+
+                        // Size, alpha, and velocity-aligned stretch
+                        sizes[idx] = p.currentSize;
+                        alphas[idx] = p.alpha;
+                        stretches[idx] = p.stretch;
+                        idx++;
+                    }
+                }
+
+                // Zero out unused buffer entries
+                for (let i = idx; i < this.maxParticles; i++) {
+                    sizes[i] = 0;
+                    alphas[i] = 0;
+                    stretches[i] = 1;
+                }
+
+                // Mark buffers for GPU upload
+                geo.attributes.position.needsUpdate = true;
+                geo.attributes.color.needsUpdate = true;
+                geo.attributes.size.needsUpdate = true;
+                geo.attributes.alpha.needsUpdate = true;
+                geo.attributes.stretch.needsUpdate = true;
+            }
+
+            /**
+             * Clear all particles (used when switching vehicles)
+             */
+            clear() {
+                for (let i = 0; i < this.maxParticles; i++) {
+                    this.particles[i].active = false;
+                }
+                this.accumulator = 0;
+                this.updateBuffers();
+            }
+        }
+
+        const emitter = new ParticleEmitter(5000);
+
+        // ========================================
+        // BODY-FIXED COORDINATE AXES
+        // ========================================
+        let bodyAxes = null;
+
+        /**
+         * Create body-fixed coordinate axes visualization
+         * Red = X axis, Green = Y axis, Blue = Z axis
+         * Attached to vehicle so it rotates with bank/pitch
+         */
+        function createBodyAxes(axisLength = 3.0) {
+            const axesGroup = new THREE.Group();
+            axesGroup.name = 'bodyAxes';
+
+            // Scale thickness proportionally to axis length
+            const shaftRadius = axisLength * 0.0055;
+            const coneRadius = axisLength * 0.015;
+            const coneHeight = axisLength * 0.045;
+            const shaftLength = axisLength - coneHeight;
+
+            // Materials for each axis
+            const xMaterial = new THREE.MeshBasicMaterial({ color: 0xff3333 }); // Red
+            const yMaterial = new THREE.MeshBasicMaterial({ color: 0x33ff33 }); // Green
+            const zMaterial = new THREE.MeshBasicMaterial({ color: 0x3388ff }); // Blue
+
+            // Shaft geometry (cylinder)
+            const shaftGeometry = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 8);
+
+            // Cone geometry (arrowhead)
+            const coneGeometry = new THREE.ConeGeometry(coneRadius, coneHeight, 12);
+
+            // X Axis (Red) - points along +X
+            const xShaft = new THREE.Mesh(shaftGeometry, xMaterial);
+            xShaft.rotation.z = -Math.PI / 2; // Rotate cylinder to point along X
+            xShaft.position.x = shaftLength / 2;
+
+            const xCone = new THREE.Mesh(coneGeometry, xMaterial);
+            xCone.rotation.z = -Math.PI / 2;
+            xCone.position.x = shaftLength + coneHeight / 2;
+
+            const xAxis = new THREE.Group();
+            xAxis.add(xShaft);
+            xAxis.add(xCone);
+            axesGroup.add(xAxis);
+
+            // Y Axis (Green) - points along +Y
+            const yShaft = new THREE.Mesh(shaftGeometry, yMaterial);
+            yShaft.position.y = shaftLength / 2;
+
+            const yCone = new THREE.Mesh(coneGeometry, yMaterial);
+            yCone.position.y = shaftLength + coneHeight / 2;
+
+            const yAxis = new THREE.Group();
+            yAxis.add(yShaft);
+            yAxis.add(yCone);
+            axesGroup.add(yAxis);
+
+            // Z Axis (Blue) - points along +Z
+            const zShaft = new THREE.Mesh(shaftGeometry, zMaterial);
+            zShaft.rotation.x = Math.PI / 2; // Rotate cylinder to point along Z
+            zShaft.position.z = shaftLength / 2;
+
+            const zCone = new THREE.Mesh(coneGeometry, zMaterial);
+            zCone.rotation.x = Math.PI / 2;
+            zCone.position.z = shaftLength + coneHeight / 2;
+
+            const zAxis = new THREE.Group();
+            zAxis.add(zShaft);
+            zAxis.add(zCone);
+            axesGroup.add(zAxis);
+
+            return axesGroup;
+        }
+
+        /**
+         * Create world-fixed wind axes for uncontrolled reentry
+         * Shows velocity direction (+X = red/orange), vertical (+Y = green), lateral (+Z = blue)
+         * Not attached to vehicle - stays fixed in world space
+         */
+        function createWindAxes(axisLength = 48.0) {
+            const axesGroup = new THREE.Group();
+            axesGroup.name = 'windAxes';
+
+            // Scale thickness proportionally to axis length
+            const shaftRadius = axisLength * 0.0055;
+            const coneRadius = axisLength * 0.015;
+            const coneHeight = axisLength * 0.045;
+            const shaftLength = axisLength - coneHeight;
+
+            // Materials - velocity axis is orange to distinguish from body axes
+            const velMaterial = new THREE.MeshBasicMaterial({ color: 0xff6600 }); // Orange (velocity)
+            const upMaterial = new THREE.MeshBasicMaterial({ color: 0x33ff33 });  // Green (up)
+            const latMaterial = new THREE.MeshBasicMaterial({ color: 0x3388ff }); // Blue (lateral)
+
+            const shaftGeometry = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 8);
+            const coneGeometry = new THREE.ConeGeometry(coneRadius, coneHeight, 12);
+
+            // Velocity Axis (Orange) - points along +X (flow direction)
+            const velShaft = new THREE.Mesh(shaftGeometry, velMaterial);
+            velShaft.rotation.z = -Math.PI / 2;
+            velShaft.position.x = shaftLength / 2;
+
+            const velCone = new THREE.Mesh(coneGeometry, velMaterial);
+            velCone.rotation.z = -Math.PI / 2;
+            velCone.position.x = shaftLength + coneHeight / 2;
+
+            const velAxis = new THREE.Group();
+            velAxis.add(velShaft);
+            velAxis.add(velCone);
+            axesGroup.add(velAxis);
+
+            // Up Axis (Green) - points along +Y
+            const upShaft = new THREE.Mesh(shaftGeometry, upMaterial);
+            upShaft.position.y = shaftLength / 2;
+
+            const upCone = new THREE.Mesh(coneGeometry, upMaterial);
+            upCone.position.y = shaftLength + coneHeight / 2;
+
+            const upAxis = new THREE.Group();
+            upAxis.add(upShaft);
+            upAxis.add(upCone);
+            axesGroup.add(upAxis);
+
+            // Lateral Axis (Blue) - points along +Z
+            const latShaft = new THREE.Mesh(shaftGeometry, latMaterial);
+            latShaft.rotation.x = Math.PI / 2;
+            latShaft.position.z = shaftLength / 2;
+
+            const latCone = new THREE.Mesh(coneGeometry, latMaterial);
+            latCone.rotation.x = Math.PI / 2;
+            latCone.position.z = shaftLength + coneHeight / 2;
+
+            const latAxis = new THREE.Group();
+            latAxis.add(latShaft);
+            latAxis.add(latCone);
+            axesGroup.add(latAxis);
+
+            return axesGroup;
+        }
+
+        // ========================================
+        // VEHICLE LOADING
+        // ========================================
+        const loader = new GLTFLoader();
+
+        // Keywords to identify heat shield meshes
+        const heatShieldKeywords = ['heat', 'shield', 'thermal', 'ablat', 'tps', 'tile', 'heatshield'];
+
+        function isHeatShieldMesh(name, vehicleConfig) {
+            if (vehicleConfig && vehicleConfig.heatShieldMeshes) {
+                if (vehicleConfig.heatShieldMeshes.some(n => name.toLowerCase().includes(n.toLowerCase()))) {
+                    return true;
+                }
+            }
+            const lowerName = name.toLowerCase();
+            return heatShieldKeywords.some(keyword => lowerName.includes(keyword));
+        }
+
+        function loadVehicle(vehicleNum) {
+            const config = vehicles[vehicleNum];
+            if (!config) return;
+
+            currentVehicleConfig = config;
+            emitter.clear();
+            plasmaEmitter.clear();
+            if (shockHalo) shockHalo.visible = false;
+
+            // Reset bow shock state for new vehicle
+            shieldCenter.set(0, 0, 0);
+            shieldNormal.set(-1, 0, 0);  // Points upstream
+            smoothedShieldCenter.set(0, 0, 0);
+            smoothedShieldNormal.set(-1, 0, 0);  // Points upstream
+            smoothedRadius = 2.0;
+            maxShieldRadius = 2.0;
+
+            // Clear bow shock geometry
+            if (shockHaloGeometry) {
+                shockHaloGeometry.dispose();
+                shockHaloGeometry = new THREE.BufferGeometry();
+                if (shockHalo) shockHalo.geometry = shockHaloGeometry;
+            }
+
+            const loading = document.getElementById('loading');
+            loading.style.display = 'block';
+            loading.textContent = `Loading ${config.name}...`;
+
+            document.querySelectorAll('.vehicle-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.vehicle === String(vehicleNum));
+            });
+
+            loader.load(
+                './' + config.filename,
+                (gltf) => {
+                    if (currentVehicle) {
+                        scene.remove(currentVehicle);
+                        originalMaterials.clear();
+                        heatShieldMeshes = [];
+                        heatShieldVertices = [];
+                        allVehicleMeshes = [];
+                        dynamicHeatMaterials.clear();
+                    }
+
+                    currentVehicle = gltf.scene;
+
+                    // Center and scale
+                    const box = new THREE.Box3().setFromObject(currentVehicle);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 4 / maxDim;
+
+                    currentVehicle.scale.multiplyScalar(scale);
+                    currentVehicle.position.sub(center.multiplyScalar(scale));
+
+                    // Find heat shield meshes and collect vertices
+                    currentVehicle.traverse((child) => {
+                        if (child.isMesh) {
+                            const isHeatShield = isHeatShieldMesh(child.name, config);
+
+                            originalMaterials.set(child, child.material.clone());
+
+                            if (isHeatShield) {
+                                // Create heat-reactive material
+                                const heatMat = createHeatShieldMaterial();
+                                child.material = heatMat;
+                                heatShieldMeshes.push(child);
+
+                                // Collect vertices for particle spawning
+                                const positions = child.geometry.attributes.position;
+                                for (let i = 0; i < positions.count; i++) {
+                                    heatShieldVertices.push(new THREE.Vector3(
+                                        positions.getX(i),
+                                        positions.getY(i),
+                                        positions.getZ(i)
+                                    ));
+                                }
+
+                                console.log(`Heat shield: ${child.name} (${positions.count} vertices)`);
+                            }
+                        }
+                    });
+
+                    scene.add(currentVehicle);
+
+                    // Add coordinate axes
+                    // For controlled vehicles: body-fixed axes (rotate with vehicle)
+                    // For uncontrolled (tumbling): world-fixed wind axes
+                    if (bodyAxes) {
+                        bodyAxes.parent?.remove(bodyAxes);
+                    }
+                    if (windAxes) {
+                        scene.remove(windAxes);
+                        windAxes = null;
+                    }
+
+                    if (config.isTumbling) {
+                        // Uncontrolled reentry - add world-fixed wind axes
+                        // Size axes to 0.28x the max dimension
+                        const axisLength = maxDim * scale * 0.28;
+                        windAxes = createWindAxes(axisLength);
+                        windAxes.position.set(0, 0, 0);
+                        scene.add(windAxes);  // Add to scene, not vehicle
+                        // Also add small body axes to show vehicle orientation
+                        bodyAxes = createBodyAxes(axisLength * 0.4);  // Smaller body axes
+                        bodyAxes.position.set(0, 0, 0);
+                        currentVehicle.add(bodyAxes);
+                    } else {
+                        // Controlled vehicle - body-fixed axes only
+                        // Custom axis sizes for specific vehicles
+                        let axesSize = 48.0;
+                        const nameLower = config.name.toLowerCase();
+                        if (nameLower.includes('shuttle') || nameLower.includes('orbiter')) {
+                            axesSize = 100.8;
+                        } else if (nameLower.includes('x-37') || nameLower.includes('x37')) {
+                            axesSize = 192.0;
+                        }
+                        bodyAxes = createBodyAxes(axesSize);
+                        bodyAxes.position.set(0, 0, 0);
+                        currentVehicle.add(bodyAxes);
+                    }
+
+                    loading.style.display = 'none';
+
+                    // Setup dynamic heating for tumbling vehicles (like school bus)
+                    if (config.dynamicHeatShield) {
+                        setupDynamicHeating();
+                        console.log(`Dynamic heating enabled for ${config.name} with ${allVehicleMeshes.length} meshes`);
+                    }
+
+                    // Initialize tumbling for uncontrolled reentry vehicles
+                    if (config.isTumbling) {
+                        initTumbleState();
+                        console.log(`Tumbling enabled for ${config.name}`);
+                    }
+
+                    // Update heat shield status
+                    document.getElementById('heatShieldStatus').textContent =
+                        heatShieldMeshes.length > 0 ? `${heatShieldMeshes.length} mesh(es)` :
+                        (config.dynamicHeatShield ? `${allVehicleMeshes.length} dynamic` : 'Not found');
+
+                    // Apply current heat flux
+                    updateHeatShield(heatFlux);
+                    if (config.dynamicHeatShield) {
+                        updateDynamicHeating(heatFlux, 0);
+                    }
+
+                    console.log(`Loaded ${config.name} with ${heatShieldVertices.length} heat shield vertices`);
+                },
+                (xhr) => {
+                    const percent = Math.round(xhr.loaded / xhr.total * 100);
+                    loading.textContent = `Loading ${config.name}... ${percent}%`;
+                },
+                (error) => {
+                    console.error('Error loading model:', error);
+                    loading.textContent = `Error loading ${config.name}`;
+                    loading.style.color = '#ff6666';
+                }
+            );
+        }
+
+        // ========================================
+        // EVENT LISTENERS
+        // ========================================
+        document.querySelectorAll('.vehicle-btn').forEach(btn => {
+            btn.addEventListener('click', () => loadVehicle(parseInt(btn.dataset.vehicle)));
+        });
+
+        document.getElementById('heatFluxSlider').addEventListener('input', (e) => {
+            heatFlux = parseFloat(e.target.value);
+            document.getElementById('heatFluxValue').textContent = heatFlux;
+            updateHeatShield(heatFlux);
+        });
+
+        document.getElementById('trailLengthSlider').addEventListener('input', (e) => {
+            trailLengthMultiplier = parseFloat(e.target.value);
+            document.getElementById('trailLengthValue').textContent = trailLengthMultiplier.toFixed(1);
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === '1') loadVehicle(1);
+            if (e.key === '2') loadVehicle(2);
+            if (e.key === '3') loadVehicle(3);
+            if (e.key === '4') loadVehicle(4);
+            if (e.key === '5') loadVehicle(5);
+            if (e.key === '6') loadVehicle(6);
+            if (e.key === '7') loadVehicle(7);
+            // Toggle debug visualization with 'D' key
+            if (e.key === 'd' || e.key === 'D') {
+                DEBUG_BOW_SHOCK = !DEBUG_BOW_SHOCK;
+                if (debugGroup) debugGroup.visible = DEBUG_BOW_SHOCK;
+                console.log('Bow shock debug:', DEBUG_BOW_SHOCK ? 'ON' : 'OFF');
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ========================================
+        // ANIMATION LOOP
+        // ========================================
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.1); // Cap delta time
+
+            // ========================================
+            // Update Tumbling Motion (for uncontrolled reentry)
+            // ========================================
+            updateTumble(dt);
+
+            // ========================================
+            // Update Heat Shield Charring Animation
+            // ========================================
+            updateHeatShield(heatFlux, dt);
+
+            // ========================================
+            // Update Dynamic Windward Heating (School Bus)
+            // ========================================
+            if (currentVehicleConfig && currentVehicleConfig.dynamicHeatShield) {
+                updateDynamicHeating(heatFlux, dt);
+            }
+
+            // ========================================
+            // LAYER 1: Update Shock Halo
+            // ========================================
+            updateShockHalo(heatFlux, dt);
+
+            // ========================================
+            // LAYER 2: Update Plasma Wake
+            // ========================================
+            const plasmaCount = plasmaEmitter.update(dt, heatFlux);
+
+            // ========================================
+            // LAYER 3: Update Soot Trail
+            // ========================================
+            const sootCount = emitter.update(dt, heatFlux);
+
+            // Update particle count display (combined)
+            document.getElementById('particleCount').textContent = plasmaCount + sootCount;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Load first vehicle
+        loadVehicle(1);
+    </script>
+</body>
+</html>
