@@ -1032,6 +1032,31 @@
                 }
             }
             
+            // Orbit camera in local frame (used in trajectory mode with horizonLocked).
+            // deltaH = horizontal screen drag scaled by speed, deltaV = vertical screen drag scaled by speed.
+            function orbitLocalFrame(deltaH, deltaV) {
+                const pivot = cameraState.pivotPoint;
+                const localUp = pivot.clone().normalize();
+                const offset = camera.position.clone().sub(pivot);
+                const lookDir = pivot.clone().sub(camera.position).normalize();
+                const cameraRight = new THREE.Vector3().crossVectors(lookDir, localUp).normalize();
+
+                // Horizontal drag: orbit around local vertical
+                if (deltaH !== 0) {
+                    const rotH = new THREE.Quaternion().setFromAxisAngle(localUp, -deltaH);
+                    offset.applyQuaternion(rotH);
+                }
+                // Vertical drag: orbit around camera's right vector
+                if (deltaV !== 0) {
+                    const rotV = new THREE.Quaternion().setFromAxisAngle(cameraRight, deltaV);
+                    offset.applyQuaternion(rotV);
+                }
+
+                cameraState.radius = offset.length();
+                cameraState.yaw   = Math.atan2(offset.z, offset.x);
+                cameraState.pitch = Math.acos(THREE.MathUtils.clamp(offset.y / cameraState.radius, -1, 1));
+            }
+
             // Switch camera mode
             function setCameraMode(mode) {
                 cameraState.mode = mode;
@@ -1946,14 +1971,17 @@
                     const deltaX = e.clientX - previousMousePosition.x;
                     const deltaY = e.clientY - previousMousePosition.y;
                     
-                    // Yaw (left/right rotation)
-                    cameraState.yaw -= deltaX * cameraState.rotationSpeed;
-                    
-                    // Pitch (up/down rotation) - clamped to prevent flipping
-                    cameraState.pitch += deltaY * cameraState.rotationSpeed;
-                    cameraState.pitch = Math.max(cameraState.minPitch, 
-                                                  Math.min(cameraState.maxPitch, cameraState.pitch));
-                    
+                    if (cameraState.mode === 'trajectory' && cameraState.horizonLocked) {
+                        // Rotate in local frame so drag axes match what the user sees on screen
+                        orbitLocalFrame(deltaX * cameraState.rotationSpeed, deltaY * cameraState.rotationSpeed);
+                    } else {
+                        // Global mode: standard spherical yaw/pitch
+                        cameraState.yaw -= deltaX * cameraState.rotationSpeed;
+                        cameraState.pitch += deltaY * cameraState.rotationSpeed;
+                        cameraState.pitch = Math.max(cameraState.minPitch,
+                                                      Math.min(cameraState.maxPitch, cameraState.pitch));
+                    }
+
                     updateCameraFromSpherical();
                     
                     previousMousePosition = { x: e.clientX, y: e.clientY };
@@ -1996,24 +2024,40 @@
                 switch(e.key) {
                     case 'ArrowLeft':
                         e.preventDefault();
-                        cameraState.yaw -= cameraState.keyRotationSpeed;
+                        if (cameraState.mode === 'trajectory' && cameraState.horizonLocked) {
+                            orbitLocalFrame(-cameraState.keyRotationSpeed, 0);
+                        } else {
+                            cameraState.yaw -= cameraState.keyRotationSpeed;
+                        }
                         updateCameraFromSpherical();
                         break;
                     case 'ArrowRight':
                         e.preventDefault();
-                        cameraState.yaw += cameraState.keyRotationSpeed;
+                        if (cameraState.mode === 'trajectory' && cameraState.horizonLocked) {
+                            orbitLocalFrame(cameraState.keyRotationSpeed, 0);
+                        } else {
+                            cameraState.yaw += cameraState.keyRotationSpeed;
+                        }
                         updateCameraFromSpherical();
                         break;
                     case 'ArrowUp':
                         e.preventDefault();
-                        cameraState.pitch -= cameraState.keyRotationSpeed;
-                        cameraState.pitch = Math.max(cameraState.minPitch, cameraState.pitch);
+                        if (cameraState.mode === 'trajectory' && cameraState.horizonLocked) {
+                            orbitLocalFrame(0, -cameraState.keyRotationSpeed);
+                        } else {
+                            cameraState.pitch -= cameraState.keyRotationSpeed;
+                            cameraState.pitch = Math.max(cameraState.minPitch, cameraState.pitch);
+                        }
                         updateCameraFromSpherical();
                         break;
                     case 'ArrowDown':
                         e.preventDefault();
-                        cameraState.pitch += cameraState.keyRotationSpeed;
-                        cameraState.pitch = Math.min(cameraState.maxPitch, cameraState.pitch);
+                        if (cameraState.mode === 'trajectory' && cameraState.horizonLocked) {
+                            orbitLocalFrame(0, cameraState.keyRotationSpeed);
+                        } else {
+                            cameraState.pitch += cameraState.keyRotationSpeed;
+                            cameraState.pitch = Math.min(cameraState.maxPitch, cameraState.pitch);
+                        }
                         updateCameraFromSpherical();
                         break;
                     case '+':
