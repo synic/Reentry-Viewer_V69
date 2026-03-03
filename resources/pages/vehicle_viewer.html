@@ -3495,7 +3495,7 @@
             });
 
             loader.load(
-                './' + config.filename,
+                '../models/' + config.filename,
                 (gltf) => {
                     if (currentVehicle) {
                         scene.remove(currentVehicle);
@@ -3717,5 +3717,14 @@
         // Load first vehicle
         loadVehicle(1);
     </script>
+<script src="../js/neutralino.js"></script>
+<script>
+  if (typeof Neutralino !== 'undefined') {
+    Neutralino.init();
+    Neutralino.events.on('windowClose', () => {
+      Neutralino.app.exit();
+    });
+  }
+</script>
 </body>
 </html>

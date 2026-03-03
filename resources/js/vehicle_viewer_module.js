@@ -3530,7 +3530,7 @@ export function initializeVehicleViewer(containerElement, config = {}) {
         smoothedRadius = 2.0;
 
         loader.load(
-            vehicleConfig.filename,
+            '../models/' + vehicleConfig.filename,
             (gltf) => {
                 currentVehicle = gltf.scene;
 

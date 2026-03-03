@@ -1,0 +1,13 @@
+{
+  "name": "reentry-viewer-v69",
+  "version": "1.0.0",
+  "description": "3D spacecraft reentry simulation viewer",
+  "scripts": {
+    "dev": "npx neu run",
+    "build": "npx neu build --release && bash scripts/build-mac-app.sh",
+    "update": "npx neu update"
+  },
+  "devDependencies": {
+    "@neutralinojs/neu": "^11.7.0"
+  }
+}

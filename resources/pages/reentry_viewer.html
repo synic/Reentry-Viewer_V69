@@ -711,5 +711,14 @@
         }
         animate();
     </script>
+<script src="../js/neutralino.js"></script>
+<script>
+  if (typeof Neutralino !== 'undefined') {
+    Neutralino.init();
+    Neutralino.events.on('windowClose', () => {
+      Neutralino.app.exit();
+    });
+  }
+</script>
 </body>
 </html>

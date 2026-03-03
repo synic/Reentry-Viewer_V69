@@ -1,0 +1,56 @@
+name: Build Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Neutralinojs CLI
+        run: npm install -g @neutralinojs/neu
+
+      - name: Download Neutralinojs binaries and client
+        run: neu update
+
+      - name: Build release
+        run: neu build --release
+
+      - name: Create macOS .app bundle
+        run: bash scripts/build-mac-app.sh
+
+      - name: Zip macOS .app bundle
+        run: cd dist/reentry-viewer && zip -r "Reentry-Viewer-mac.zip" "Reentry Viewer.app"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-builds
+          path: dist/reentry-viewer/
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/reentry-viewer/Reentry-Viewer-mac.zip
+            dist/reentry-viewer/reentry-viewer-win_x64.exe
+            dist/reentry-viewer/reentry-viewer-linux_x64
+            dist/reentry-viewer/resources.neu
+          generate_release_notes: true
